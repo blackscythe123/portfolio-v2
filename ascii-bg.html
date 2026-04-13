@@ -397,6 +397,69 @@
     }
     // Start typing after name animation settles
     setTimeout(typeLoop, 1500);
+
+    // ── Transition Effect ─────────────────────────────────────────
+    const btnSkills = document.getElementById('btn-skills');
+    btnSkills.addEventListener('click', (e) => {
+      e.preventDefault();
+      
+      // Stop typing
+      deleting = true;
+
+      // 1. Create Rocket
+      const rocket = document.createElement('div');
+      rocket.textContent = '>>======🚀';
+      rocket.style.position = 'fixed';
+      rocket.style.top = '50%';
+      rocket.style.left = '-150px';
+      rocket.style.transform = 'translateY(-50%)';
+      rocket.style.fontSize = '2rem';
+      rocket.style.color = '#00e5ff';
+      rocket.style.fontFamily = '"JetBrains Mono", monospace';
+      rocket.style.zIndex = '1000';
+      rocket.style.pointerEvents = 'none';
+      rocket.style.transition = 'left 1.2s cubic-bezier(0.8, 0, 0.2, 1)';
+      document.body.appendChild(rocket);
+
+      // Create two black curtains for the tear
+      const curtainWrapper = document.createElement('div');
+      curtainWrapper.style.position = 'fixed';
+      curtainWrapper.style.inset = '0';
+      curtainWrapper.style.zIndex = '999';
+      curtainWrapper.style.pointerEvents = 'none';
+      curtainWrapper.style.display = 'flex';
+      
+      const c1 = document.createElement('div');
+      const c2 = document.createElement('div');
+      c1.style.width = '50%'; c1.style.height = '100%'; c1.style.background = '#000';
+      c2.style.width = '50%'; c2.style.height = '100%'; c2.style.background = '#000';
+      
+      // Start them open (scaled 0), and then close them tightly behind the rocket
+      c1.style.transformOrigin = 'left';
+      c2.style.transformOrigin = 'right';
+      c1.style.transform = 'scaleX(0)';
+      c2.style.transform = 'scaleX(0)';
+      c1.style.transition = 'transform 0.4s ease-in 0.4s';
+      c2.style.transition = 'transform 0.4s ease-in 0.4s';
+      
+      curtainWrapper.appendChild(c1);
+      curtainWrapper.appendChild(c2);
+      document.body.appendChild(curtainWrapper);
+
+      // Launch rocket
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          rocket.style.left = '120vw';
+          c1.style.transform = 'scaleX(1)';
+          c2.style.transform = 'scaleX(1)';
+        });
+      });
+
+      // Redirect once torn/blacked out
+      setTimeout(() => {
+        window.location.href = 'skills.html';
+      }, 1000);
+    });
   </script>
 </body>
 </html>

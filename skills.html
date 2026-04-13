@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Skills - Galaxies</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100vw; height: 100vh;
+      background: #000; overflow: hidden;
+      font-family: 'JetBrains Mono', monospace;
+      color: #e2f4f8;
+    }
+    
+    #visual { position: fixed; inset: 0; z-index: 1; display: block; }
+
+    /* Curtain effect overlays */
+    .curtain {
+      position: fixed; top: 0; height: 100vh; width: 50vw;
+      background: #000; z-index: 100;
+      transition: transform 1.5s cubic-bezier(0.8, 0, 0.2, 1);
+    }
+    #curtain-left { left: 0; transform-origin: left; }
+    #curtain-right { right: 0; transform-origin: right; }
+    body.loaded #curtain-left { transform: scaleX(0); }
+    body.loaded #curtain-right { transform: scaleX(0); }
+
+    /* Skill detail overlay */
+    #skill-detail {
+      position: fixed; inset: 0; z-index: 50;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+    #skill-detail.active {
+      opacity: 1; pointer-events: auto;
+    }
+    
+    .skill-card {
+      border: 1px solid rgba(0,229,255,0.4);
+      background: rgba(2, 8, 22, 0.9);
+      padding: 3rem; max-width: 600px; width: 90%;
+      box-shadow: 0 0 40px rgba(0,229,255,0.1);
+      transform: translateY(30px);
+      transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    #skill-detail.active .skill-card { transform: translateY(0); }
+    
+    .category {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 2.5rem; font-weight: 700; text-transform: uppercase;
+      color: #fff; margin-bottom: 1rem;
+      text-shadow: 0 0 15px rgba(0,229,255,0.5);
+    }
+    .tools {
+      font-size: 0.9rem; color: #10b981; margin-bottom: 2rem;
+      letter-spacing: 0.1em;
+    }
+    .desc {
+      font-size: 0.85rem; color: rgba(255,255,255,0.7); line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+    .btn-close {
+      display: inline-block; padding: 0.6rem 1.5rem;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff; text-decoration: none; text-transform: uppercase; font-size: 0.8rem;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-close:hover { border-color: #00e5ff; color: #00e5ff; }
+
+    /* HUD */
+    #hud {
+      position: fixed; top: 2rem; left: 2rem; z-index: 20; pointer-events: none;
+    }
+    .hud-text { font-size: 0.75rem; color: rgba(0,229,255,0.7); letter-spacing: 0.2em; text-transform: uppercase; }
+
+    #back-btn {
+      position: fixed; top: 2rem; right: 2rem; z-index: 20;
+      padding: 0.5rem 1rem; color: rgba(255,255,255,0.6);
+      border: 1px solid rgba(255,255,255,0.2); text-decoration: none;
+      font-size: 0.75rem; letter-spacing: 0.1em; transition: all 0.2s;
+    }
+    #back-btn:hover { color: #fff; border-color: #fff; }
+  </style>
+</head>
+<body>
+
+  <div id="curtain-left" class="curtain"></div>
+  <div id="curtain-right" class="curtain"></div>
+
+  <canvas id="visual"></canvas>
+
+  <div id="hud">
+    <div class="hud-text">SECTOR: SKILLS_NET</div>
+    <div class="hud-text" style="color: rgba(255,255,255,0.4); margin-top: 5px;">CLICK CORE TO INSPECT</div>
+  </div>
+  
+  <a href="ascii-bg.html" id="back-btn">[ RETURN ]</a>
+
+  <div id="skill-detail">
+    <div class="skill-card">
+      <div class="category" id="modal-title">CATEGORY</div>
+      <div class="tools" id="modal-tools">TOOL_1 // TOOL_2 // TOOL_3</div>
+      <div class="desc" id="modal-desc">Detailed analytics and skill profiling placeholder.</div>
+      <a class="btn-close" id="btn-close">[ CLOSE ]</a>
+    </div>
+  </div>
+
+  <script type="module">
+    // Skills Data
+    const skillsData = [
+      { id: 'frontend', title: 'FRONTEND', desc: 'Crafting immersive, high-performance interfaces with modern frameworks and web APIs.', tools: 'REACT // NEXT.JS // TYPESCRIPT // TAILWIND // THREE.JS', pos: {x: 0.35, y: 0.45} },
+      { id: 'backend', title: 'BACKEND', desc: 'Building scalable, secure server-side architectures and APIs.', tools: 'NODE.JS // PYTHON // POSTGRES // REDIS', pos: {x: 0.55, y: 0.25} },
+      { id: 'automation', title: 'AUTOMATION', desc: 'Streamlining workflows and tasks through robust scripting and automation pipelines.', tools: 'BASH // PYTHON // GITHUB ACTIONS // PUPPETEER', pos: {x: 0.55, y: 0.48} },
+      { id: 'system', title: 'SYSTEM DESIGN', desc: 'Architecting end-to-end resilient systems tailored for distributed scale.', tools: 'MICROSERVICES // CACHING // EVENT-DRIVEN // LOAD BALANCING', pos: {x: 0.55, y: 0.58} },
+      { id: 'cloud', title: 'CLOUD', desc: 'Deploying and orchestrating containerized applications on cloud infrastructure.', tools: 'AWS // DOCKER // KUBERNETES // TERRAFORM', pos: {x: 0.50, y: 0.78} }
+    ];
+
+    const FONT_PX = 9;
+    const FONT_STR = `${FONT_PX}px "Courier New", Courier, monospace`;
+    const CHARS_SRC = '01jjbdwjlbhefhdewfiweqwdke;edkdewpokewokpewpoewpoewdewd.dkjsxjhsaj>/,!#@$^@*@(eiu3838dasjdsaadssddsadasdaoi;ejqu3n832-c23n-cwpncehpn38uxe7b2ppUIFOHN82893288938973HJUDLKJSDKJLNNiuospewp8c3p8mc48mp348ymp34c8mp34c8mp94cpmc4pm734789782664782426C7QY47Q4Y@'; // density ramp
+    
+    let charW = FONT_PX * 0.601;
+    const charH = FONT_PX;
+    
+    const oc = new OffscreenCanvas(400,20).getContext('2d');
+    oc.font = FONT_STR;
+    charW = oc.measureText('X'.repeat(50)).width / 50;
+
+    let W = window.innerWidth;
+    let H = window.innerHeight;
+    let cols = Math.floor(W / charW);
+    let rows = Math.floor(H / charH);
+    let N = cols * rows;
+
+    const canvas = document.getElementById('visual');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.font = FONT_STR;
+    ctx.textBaseline = 'top';
+
+    let origChars = new Uint8Array(N);
+    let colR = new Uint8Array(N);
+    let colG = new Uint8Array(N);
+    let colB = new Uint8Array(N);
+
+    // Camera
+    let cam = { x: 0, y: 0, scale: 1, targetX: 0, targetY: 0, targetScale: 1 };
+    
+    // Core spin angles
+    let time = 0;
+
+    await new Promise((res, rej) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const src = document.createElement('canvas');
+        src.width = cols; src.height = rows;
+        const sx = src.getContext('2d');
+        // keep image proportion? Let's just fill for now to cover space
+        // Or cover proportion
+        const aspect = img.width / img.height;
+        const screenAspect = cols / rows;
+        let dw = cols, dh = rows, dx = 0, dy = 0;
+        if(screenAspect > aspect) { dh = cols / aspect; dy = (rows - dh)/2; }
+        else { dw = rows * aspect; dx = (cols - dw)/2; }
+        
+        sx.drawImage(img, dx, dy, dw, dh);
+        const { data } = sx.getImageData(0, 0, cols, rows);
+        for (let i = 0; i < N; i++) {
+          const p = i*4;
+          colR[i] = data[p]; colG[i] = data[p+1]; colB[i] = data[p+2];
+          const b = 0.299*data[p] + 0.587*data[p+1] + 0.114*data[p+2];
+          origChars[i] = Math.floor((b/255)*(CHARS_SRC.length-1));
+        }
+        res();
+      };
+      img.onerror = rej;
+      img.src = 'galaxy.webp';
+    });
+
+    // Handle Resize
+    // Skipping full dynamic resize for simplicity here, but can be added. 
+
+    let mx = -999, my = -999;
+    document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+
+    let activeSkill = null;
+    const modal = document.getElementById('skill-detail');
+    
+    canvas.addEventListener('click', () => {
+      if(activeSkill !== null) return;
+      
+      const mCol = mx / charW;
+      const mRow = my / charH;
+
+      for(let s of skillsData) {
+        const cCol = s.pos.x * cols;
+        const cRow = s.pos.y * rows;
+        const distCol = (cCol - mCol);
+        const distRow = (cRow - mRow);
+        const dist = Math.sqrt(distCol*distCol*charW*charW + distRow*distRow*charH*charH);
+        
+        if(dist < 50) {
+          // clicked this core!
+          cam.targetScale = 3;
+          cam.targetX = cCol * charW;
+          cam.targetY = cRow * charH;
+          activeSkill = s;
+          
+          document.getElementById('modal-title').innerText = s.title;
+          document.getElementById('modal-tools').innerText = s.tools;
+          document.getElementById('modal-desc').innerText = s.desc;
+          
+          setTimeout(() => { modal.classList.add('active'); }, 600);
+          break;
+        }
+      }
+    });
+
+    document.getElementById('btn-close').addEventListener('click', () => {
+      modal.classList.remove('active');
+      activeSkill = null;
+      cam.targetScale = 1;
+      cam.targetX = 0;
+      cam.targetY = 0;
+    });
+
+    function frame() {
+      // Lerp camera
+      cam.scale += (cam.targetScale - cam.scale) * 0.05;
+      if(cam.targetScale === 1) {
+        cam.x += (0 - cam.x) * 0.05;
+        cam.y += (0 - cam.y) * 0.05;
+      } else {
+        const tgtX = W/2 - cam.targetX * cam.scale;
+        const tgtY = H/2 - cam.targetY * cam.scale;
+        cam.x += (tgtX - cam.x) * 0.05;
+        cam.y += (tgtY - cam.y) * 0.05;
+      }
+
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, W, H);
+      
+      ctx.save();
+      ctx.translate(cam.x, cam.y);
+      ctx.scale(cam.scale, cam.scale);
+
+      time += 0.05;
+      
+      const mCol = (mx - cam.x) / cam.scale / charW;
+      const mRow = (my - cam.y) / cam.scale / charH;
+
+      for (let r = 0; r < rows; r++) {
+        const y = r * charH;
+        for (let c = 0; c < cols; c++) {
+          const idx = r*cols+c;
+          
+          // only draw cells within viewport bounds after transform? 
+          // For now, draw all since N is not insanely large, or optimize.
+          // Optimization: skip if out of view
+          const screenX = cam.x + c * charW * cam.scale;
+          const screenY = cam.y + r * charH * cam.scale;
+          if (screenX < -20 || screenX > W+20 || screenY < -20 || screenY > H+20) continue;
+
+          let ch = CHARS_SRC[origChars[idx]];
+          let isCore = false;
+          let coreDist = 999;
+          
+          // check distance to cores for spin/hover effect
+          for (let s of skillsData) {
+            const cc = s.pos.x * cols;
+            const cr = s.pos.y * rows;
+            const dCol = c - cc;
+            const dRow = r - cr;
+            const dist = Math.sqrt(dCol*dCol + dRow*dRow);
+            if(dist < coreDist) coreDist = dist;
+            
+            if(dist < 5) {
+              if (Math.random() < 0.1) ch = '*';
+            }
+          }
+          
+          const boost = Math.max(0, (10 - coreDist)) * 10;
+          let r_ = Math.min(255, colR[idx] + boost) | 0;
+          let g_ = Math.min(255, colG[idx] + boost) | 0;
+          let b_ = Math.min(255, colB[idx] + boost) | 0;
+          
+          // Hover target
+          const distToMouse = Math.sqrt(Math.pow(c - mCol, 2)*charW*charW + Math.pow(r - mRow, 2)*charH*charH);
+          if (coreDist < 8 && distToMouse < 40 && cam.targetScale === 1) {
+            r_ = Math.min(255, r_ + 50);
+            g_ = Math.min(255, g_ + 150);
+            b_ = Math.min(255, b_ + 250);
+            if(Math.random() < 0.3) ch = '@';
+          }
+
+          if (r_ > 10 || g_ > 10 || b_ > 10) {
+            ctx.fillStyle = `rgb(${r_},${g_},${b_})`;
+            ctx.fillText(ch, c*charW, y);
+          }
+        }
+      }
+      
+      // Draw labels above cores if zoom=1
+      if(cam.scale < 1.1) {
+        ctx.font = `bold ${FONT_PX+1}px "JetBrains Mono"`;
+        for(let s of skillsData) {
+          const x = s.pos.x * cols * charW;
+          const y = s.pos.y * rows * charH;
+          
+          const distToMouse = Math.sqrt(Math.pow(s.pos.x*cols - mCol, 2)*charW*charW + Math.pow(s.pos.y*rows - mRow, 2)*charH*charH);
+          if (distToMouse < 40) {
+            ctx.fillStyle = '#00e5ff';
+            ctx.fillText(`[ ${s.title} ]`, x + 15, y - 10);
+            canvas.style.cursor = 'pointer';
+          }
+        }
+        ctx.font = FONT_STR; // reset
+      } else {
+        canvas.style.cursor = 'crosshair';
+      }
+
+      ctx.restore();
+      
+      if(activeSkill) {
+        // static noise or overlay effect?
+      }
+
+      requestAnimationFrame(frame);
+    }
+    
+    requestAnimationFrame(frame);
+    
+    // Start curtain unlock
+    setTimeout(() => { document.body.classList.add('loaded'); }, 100);
+
+  </script>
+</body>
+</html>
