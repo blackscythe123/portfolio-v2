@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "skills": {
+    "ckm:ui-styling": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "computedHash": "9ae38e4e201f338b6150e462b98a2db0f2ae7c180c77e8cfb1d33eba9d33bf33"
+    },
+    "pretext": {
+      "source": "yaniv-golan/pretext-skill",
+      "sourceType": "github",
+      "computedHash": "6356c8fa38cd514129684065460e31f25d7fb395976488bb902f87764faa3c0a"
+    },
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "computedHash": "8cd1b83a60e8d0a95c332d2baeffad9053617b286beb96bbe13e818507343f47"
+    }
+  }
+}

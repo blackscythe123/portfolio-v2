@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Simiyon Vinscent Samuel L</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100vw; height: 100vh;
+      background: #000;
+      overflow: hidden;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ── ASCII layers ── */
+    #visual   { position: fixed; inset: 0; z-index: 1; display: block; }
+    #selectable {
+      position: fixed; inset: 0; z-index: 2;
+      font-family: 'Courier New', monospace;
+      white-space: pre; line-height: 1;
+      color: transparent; background: transparent;
+      cursor: crosshair;
+      user-select: text; -webkit-user-select: text;
+      overflow: hidden;
+    }
+    #selectable::selection { background: rgba(0,229,255,0.3); color: transparent; }
+
+    /* ── Overlay: text floats over ASCII ── */
+    #overlay {
+      position: fixed;
+      top: 0; right: 0; bottom: 0;
+      width: 60%;
+      min-width: 600px;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 0 5rem;
+      pointer-events: none;
+    }
+
+    /* ── Greeting ── */
+    .greeting {
+      font-size: 0.8rem;
+      letter-spacing: 0.15em;
+      color: #7c3aed;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      opacity: 0;
+      animation: fadeUp 0.8s 0.2s ease forwards;
+    }
+    .status-badge {
+      border: 1px solid #7c3aed;
+      padding: 4px 10px;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      background: rgba(124, 58, 237, 0.1);
+      color: #a78bfa;
+      letter-spacing: 0.2em;
+    }
+
+    /* ── Name ── */
+    .name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.5rem, 3.2vw, 3.2rem);
+      font-weight: 900;
+      line-height: 1.05;
+      text-transform: uppercase;
+      letter-spacing: -0.01em;
+      margin-bottom: 2rem;
+      opacity: 0;
+      white-space: nowrap;
+      animation: fadeUp 0.8s 0.4s ease forwards;
+      
+      /* Solid bold fill to blend with ASCII while remaining readable */
+      color: rgba(255, 255, 255, 0.95);
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.8), 0 0 10px rgba(0, 229, 255, 0.2);
+    }
+    .name .hl {
+      color: #00e5ff;
+      text-shadow: 0 0 30px rgba(0, 229, 255, 0.5);
+    }
+
+    /* ── Typing line ── */
+    .typing-wrap {
+      font-size: 0.95rem;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 3rem;
+      min-height: 1.4em;
+      font-weight: 400;
+      opacity: 0;
+      animation: fadeUp 0.8s 0.6s ease forwards;
+    }
+    .prompt { 
+      color: #10b981; 
+      margin-right: 12px; 
+      font-weight: 700;
+    }
+    #typed-text { color: #fff; }
+    .caret {
+      display: inline-block;
+      width: 10px; height: 1em;
+      background: #00e5ff;
+      vertical-align: text-bottom;
+      margin-left: 6px;
+      animation: blink 1s step-end infinite;
+    }
+
+    /* ── Buttons ── */
+    .btn-row {
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+      pointer-events: auto;
+      opacity: 0;
+      animation: fadeUp 0.8s 0.8s ease forwards;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      font-size: 0.85rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      text-decoration: none;
+      cursor: pointer;
+      color: rgba(255,255,255,0.5);
+      transition: all 250ms ease;
+    }
+    
+    .btn::before { 
+      content: '['; 
+      margin-right: 12px; 
+      color: rgba(0,229,255,0.3); 
+      transition: all 250ms ease; 
+    }
+    .btn::after  { 
+      content: ']'; 
+      margin-left: 12px; 
+      color: rgba(0,229,255,0.3); 
+      transition: all 250ms ease; 
+    }
+    
+    .btn:hover {
+      color: #00e5ff;
+      text-shadow: 0 0 10px rgba(0,229,255,0.3);
+      transform: translateX(10px);
+    }
+    .btn:hover::before, .btn:hover::after {
+      color: #00e5ff;
+    }
+
+    /* ── Keyframes ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(30px); filter: blur(5px); }
+      to   { opacity: 1; transform: translateY(0); filter: blur(0); }
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      #overlay { width: 100%; min-width: 0; padding: 0 2rem; right: auto; left: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ASCII layers -->
+  <canvas id="visual"></canvas>
+  <pre id="selectable" aria-label="ASCII art — selectable"></pre>
+
+  <!-- Text overlay — no background box, terminal/brutalist aesthetics -->
+  <div id="overlay" aria-label="Portfolio intro">
+
+    <p class="greeting">
+      <span class="status-badge">sys.init</span>
+      // HELLO WORLD
+    </p>
+
+    <h1 class="name">
+      Simiyon <span class="hl">Vinscent</span> Samuel L
+    </h1>
+
+    <div class="typing-wrap">
+      <span class="prompt">$></span><span id="typed-text"></span><span class="caret" aria-hidden="true"></span>
+    </div>
+
+    <nav class="btn-row" aria-label="Portfolio sections">
+      <a href="#skills"   class="btn" id="btn-skills">skills</a>
+      <a href="#projects" class="btn" id="btn-projects">projects</a>
+      <a href="#contact"  class="btn" id="btn-contact">contact</a>
+    </nav>
+  </div>
+
+  <!-- ASCII engine -->
+  <script type="module">
+    // ── Pretext ──────────────────────────────────────────────────
+    let layoutWithLines, prepareWithSegments;
+    try {
+      const m = await import('https://esm.sh/@chenglou/pretext@0.1.4');
+      layoutWithLines     = m.layoutWithLines;
+      prepareWithSegments = m.prepareWithSegments;
+    } catch(e) {}
+
+    // ── Config ───────────────────────────────────────────────────
+    const FONT_PX    = 9;
+    const FONT_STR   = `${FONT_PX}px "Courier New", Courier, monospace`;
+    const CHARS_DIST = '@01#$%&*!?+=-_~:;., ';
+    const CHARS_SRC  = '01wertyuioasdfghjklQWERTYUIOASDFGHJKLZXCVBNM@';
+    const DIST_R     = 30;
+    const DIST_DECAY = 0.82;
+    const HEAT_GAIN  = 1.0;
+
+    // ── Measure charWidth via Pretext ────────────────────────────
+    await document.fonts.ready;
+    let charW = FONT_PX * 0.601;
+    const charH = FONT_PX;
+
+    if (prepareWithSegments && layoutWithLines) {
+      try {
+        const p = prepareWithSegments('X'.repeat(100), FONT_STR);
+        const r = layoutWithLines(p, Infinity, charH);
+        if (r.lines?.length) charW = r.lines[0].width / 100;
+      } catch(e) {}
+    } else {
+      const oc = new OffscreenCanvas(400,20).getContext('2d');
+      oc.font  = FONT_STR;
+      charW    = oc.measureText('X'.repeat(50)).width / 50;
+    }
+
+    // ── Grid ─────────────────────────────────────────────────────
+    const W    = window.innerWidth;
+    const H    = window.innerHeight;
+    const cols = Math.floor(W / charW);
+    const rows = Math.floor(H / charH);
+    const N    = cols * rows;
+
+    // ── Pre overlay font ─────────────────────────────────────────
+    const pre = document.getElementById('selectable');
+    pre.style.fontSize      = `${FONT_PX}px`;
+    pre.style.lineHeight    = `${charH}px`;
+    pre.style.letterSpacing = '0px';
+
+    // ── Sample image ─────────────────────────────────────────────
+    const origChars = new Uint8Array(N);
+    const colR = new Uint8Array(N);
+    const colG = new Uint8Array(N);
+    const colB = new Uint8Array(N);
+
+    await new Promise((res, rej) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const src = document.createElement('canvas');
+        src.width = cols; src.height = rows;
+        const sx  = src.getContext('2d');
+        sx.drawImage(img, 0, 0, cols, rows);
+        const { data } = sx.getImageData(0, 0, cols, rows);
+        for (let i = 0; i < N; i++) {
+          const p = i*4;
+          colR[i] = data[p]; colG[i] = data[p+1]; colB[i] = data[p+2];
+          const b = 0.299*data[p] + 0.587*data[p+1] + 0.114*data[p+2];
+          origChars[i] = Math.floor((b/255)*(CHARS_SRC.length-1));
+        }
+        res();
+      };
+      img.onerror = rej;
+      img.src = 'home-original.webp';
+    });
+
+    // ── Selectable pre content ────────────────────────────────────
+    {
+      let txt = '';
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) txt += CHARS_SRC[origChars[r*cols+c]];
+        txt += '\n';
+      }
+      pre.textContent = txt;
+    }
+
+    // ── Canvas ───────────────────────────────────────────────────
+    const canvas = document.getElementById('visual');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.font = FONT_STR;
+    ctx.textBaseline = 'top';
+
+    const heat = new Float32Array(N);
+    let mx = -9999, my = -9999;
+    document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+    document.addEventListener('mouseleave', () => { mx = -9999; my = -9999; });
+
+    const randChar = () => CHARS_DIST[Math.floor(Math.random()*CHARS_DIST.length)];
+
+    function frame() {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, W, H);
+      const mCol = mx / charW;
+      const mRow = my / charH;
+
+      for (let r = 0; r < rows; r++) {
+        const y = r * charH;
+        for (let c = 0; c < cols; c++) {
+          const idx = r*cols+c;
+          const dx  = (c+0.5) - mCol;
+          const dy  = (r+0.5) - mRow;
+          const dist = Math.sqrt(dx*dx + dy*dy) * charW;
+
+          if (dist < DIST_R) {
+            const s = Math.pow(1 - dist/DIST_R, 2);
+            heat[idx] = Math.min(1, heat[idx] + HEAT_GAIN*s);
+          }
+          heat[idx] *= DIST_DECAY;
+          const h = heat[idx];
+
+          const ch = (h > 0.05 && Math.random() < h) ? randChar() : CHARS_SRC[origChars[idx]];
+          const boost = h * 180;
+          const r_ = Math.min(255, colR[idx] + boost*0.6)|0;
+          const g_ = Math.min(255, colG[idx] + boost*0.9)|0;
+          const b_ = Math.min(255, colB[idx] + boost*0.7)|0;
+
+          ctx.fillStyle = `rgb(${r_},${g_},${b_})`;
+          ctx.fillText(ch, c*charW, y);
+        }
+      }
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    // ── Typing effect ─────────────────────────────────────────────
+    const phrases = [
+      'make run creative_developer',
+      './deploy_full_stack.sh',
+      'sudo rm -rf boring_designs'
+    ];
+    const el = document.getElementById('typed-text');
+    let pi = 0, ci = 0, deleting = false;
+
+    function typeLoop() {
+      const phrase = phrases[pi];
+      if (!deleting) {
+        ci++;
+        el.textContent = phrase.slice(0, ci);
+        if (ci === phrase.length) {
+          deleting = true;
+          setTimeout(typeLoop, 2000); // pause at full phrase
+          return;
+        }
+        setTimeout(typeLoop, 50 + Math.random() * 50); // randomized typing speed
+      } else {
+        ci--;
+        el.textContent = phrase.slice(0, ci);
+        if (ci === 0) {
+          deleting = false;
+          pi = (pi + 1) % phrases.length;
+          setTimeout(typeLoop, 600);
+          return;
+        }
+        setTimeout(typeLoop, 20); // fast delete
+      }
+    }
+    // Start typing after name animation settles
+    setTimeout(typeLoop, 1500);
+  </script>
+</body>
+</html>
