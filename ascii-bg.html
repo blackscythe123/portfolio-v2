@@ -30,40 +30,53 @@
     }
     #selectable::selection { background: rgba(0,229,255,0.3); color: transparent; }
 
-    /* ── Overlay: text floats over ASCII ── */
+    /* ── Dark scrim: gradient from right so text is always readable ── */
+    /* Not a box — just darkness that fades in from the right edge.    */
     #overlay {
       position: fixed;
       top: 0; right: 0; bottom: 0;
-      width: 60%;
-      min-width: 600px;
+      width: 62%;
+      min-width: 540px;
       z-index: 20;
       display: flex;
       flex-direction: column;
       justify-content: center;
       padding: 0 5rem;
       pointer-events: none;
+
+      /* Directional scrim — darkens right half so text reads clearly */
+      background: linear-gradient(
+        to right,
+        transparent 0%,
+        rgba(0,0,0,0.50) 20%,
+        rgba(0,0,0,0.72) 60%,
+        rgba(0,0,0,0.85) 100%
+      );
     }
 
     /* ── Greeting ── */
     .greeting {
-      font-size: 0.8rem;
-      letter-spacing: 0.15em;
-      color: #7c3aed;
-      margin-bottom: 1.5rem;
+      font-size: 0.78rem;
+      letter-spacing: 0.22em;
+      color: rgba(255,255,255,0.55);          /* muted white — reads on dark scrim */
+      margin-bottom: 1.8rem;
       display: flex;
       align-items: center;
-      gap: 1rem;
+      gap: 0.9rem;
       opacity: 0;
       animation: fadeUp 0.8s 0.2s ease forwards;
     }
     .status-badge {
-      border: 1px solid #7c3aed;
-      padding: 4px 10px;
-      font-size: 0.65rem;
+      border: 1px solid rgba(0,229,255,0.5);  /* cyan border pops on dark */
+      padding: 3px 10px;
+      font-size: 0.62rem;
       text-transform: uppercase;
-      background: rgba(124, 58, 237, 0.1);
-      color: #a78bfa;
-      letter-spacing: 0.2em;
+      background: rgba(0,229,255,0.08);
+      color: #00e5ff;                          /* full cyan, contrasty on dark */
+      letter-spacing: 0.22em;
+    }
+    .greeting-slash {
+      color: rgba(255,255,255,0.3);
     }
 
     /* ── Name ── */
@@ -73,43 +86,54 @@
       font-weight: 900;
       line-height: 1.05;
       text-transform: uppercase;
-      letter-spacing: -0.01em;
-      margin-bottom: 2rem;
+      letter-spacing: 0.04em;
+      margin-bottom: 1.8rem;
       opacity: 0;
       white-space: nowrap;
       animation: fadeUp 0.8s 0.4s ease forwards;
-      
-      /* Solid bold fill to blend with ASCII while remaining readable */
-      color: rgba(255, 255, 255, 0.95);
-      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.8), 0 0 10px rgba(0, 229, 255, 0.2);
+
+      color: #ffffff;
+      /* Multi-layer shadow lifts text off any color beneath (UI skill §6) */
+      text-shadow:
+        0 0 1px rgba(0,0,0,1),
+        0 2px 8px rgba(0,0,0,0.9),
+        0 4px 24px rgba(0,0,0,0.7);
     }
     .name .hl {
       color: #00e5ff;
-      text-shadow: 0 0 30px rgba(0, 229, 255, 0.5);
+      text-shadow:
+        0 0 20px rgba(0,229,255,0.7),
+        0 2px 8px rgba(0,0,0,0.9);
     }
 
     /* ── Typing line ── */
     .typing-wrap {
-      font-size: 0.95rem;
-      color: rgba(255,255,255,0.7);
-      margin-bottom: 3rem;
-      min-height: 1.4em;
+      font-size: 0.82rem;
       font-weight: 400;
+      color: rgba(255,255,255,0.75);
+      margin-bottom: 2.8rem;
+      min-height: 1.4em;
+      letter-spacing: 0.04em;
       opacity: 0;
       animation: fadeUp 0.8s 0.6s ease forwards;
     }
-    .prompt { 
-      color: #10b981; 
-      margin-right: 12px; 
+    .prompt {
+      color: #10b981;
+      margin-right: 10px;
       font-weight: 700;
+      text-shadow: 0 0 8px rgba(16,185,129,0.5);
     }
-    #typed-text { color: #fff; }
+    #typed-text {
+      color: #fff;
+      text-shadow: 0 0 4px rgba(0,0,0,0.8);
+    }
     .caret {
       display: inline-block;
-      width: 10px; height: 1em;
+      width: 8px; height: 0.9em;
       background: #00e5ff;
       vertical-align: text-bottom;
-      margin-left: 6px;
+      margin-left: 4px;
+      box-shadow: 0 0 6px rgba(0,229,255,0.8);
       animation: blink 1s step-end infinite;
     }
 
@@ -117,56 +141,61 @@
     .btn-row {
       display: flex;
       flex-direction: column;
-      gap: 1.2rem;
+      gap: 0.75rem;
       pointer-events: auto;
       opacity: 0;
-      animation: fadeUp 0.8s 0.8s ease forwards;
+      animation: fadeUp 0.8s 0.85s ease forwards;
     }
     .btn {
       display: inline-flex;
       align-items: center;
       width: fit-content;
-      font-size: 0.85rem;
-      letter-spacing: 0.15em;
+      gap: 0.7rem;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
       text-transform: uppercase;
       text-decoration: none;
       cursor: pointer;
-      color: rgba(255,255,255,0.5);
-      transition: all 250ms ease;
+      color: rgba(255,255,255,0.85);        /* visible at rest */
+      transition: all 220ms ease;
+      padding: 2px 0;
+      text-shadow: 0 1px 6px rgba(0,0,0,0.9);
     }
-    
-    .btn::before { 
-      content: '['; 
-      margin-right: 12px; 
-      color: rgba(0,229,255,0.3); 
-      transition: all 250ms ease; 
+    .btn-num {
+      font-size: 0.58rem;
+      color: #00e5ff;
+      font-weight: 400;
+      letter-spacing: 0.05em;
+      opacity: 0.7;
     }
-    .btn::after  { 
-      content: ']'; 
-      margin-left: 12px; 
-      color: rgba(0,229,255,0.3); 
-      transition: all 250ms ease; 
+    .btn::after {
+      content: '→';
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.25);
+      transition: all 220ms ease;
     }
-    
     .btn:hover {
       color: #00e5ff;
-      text-shadow: 0 0 10px rgba(0,229,255,0.3);
-      transform: translateX(10px);
+      text-shadow: 0 0 10px rgba(0,229,255,0.4);
+      transform: translateX(8px);
     }
-    .btn:hover::before, .btn:hover::after {
+    .btn:hover::after {
       color: #00e5ff;
+      transform: translateX(4px);
     }
+    .btn:hover .btn-num { opacity: 1; }
 
     /* ── Keyframes ── */
     @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(30px); filter: blur(5px); }
-      to   { opacity: 1; transform: translateY(0); filter: blur(0); }
+      from { opacity: 0; transform: translateY(20px); filter: blur(4px); }
+      to   { opacity: 1; transform: translateY(0);    filter: blur(0);   }
     }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 
     /* Responsive */
     @media (max-width: 900px) {
-      #overlay { width: 100%; min-width: 0; padding: 0 2rem; right: auto; left: 0; }
+      #overlay { width: 100%; min-width: 0; padding: 0 2rem; }
     }
   </style>
 </head>
@@ -193,9 +222,9 @@
     </div>
 
     <nav class="btn-row" aria-label="Portfolio sections">
-      <a href="#skills"   class="btn" id="btn-skills">skills</a>
-      <a href="#projects" class="btn" id="btn-projects">projects</a>
-      <a href="#contact"  class="btn" id="btn-contact">contact</a>
+      <a href="#skills"   class="btn" id="btn-skills"><span class="btn-num">01</span> Skills</a>
+      <a href="#projects" class="btn" id="btn-projects"><span class="btn-num">02</span> Projects</a>
+      <a href="#contact"  class="btn" id="btn-contact"><span class="btn-num">03</span> Contact</a>
     </nav>
   </div>
 
@@ -212,8 +241,8 @@
     // ── Config ───────────────────────────────────────────────────
     const FONT_PX    = 9;
     const FONT_STR   = `${FONT_PX}px "Courier New", Courier, monospace`;
-    const CHARS_DIST = '@01#$%&*!?+=-_~:;., ';
-    const CHARS_SRC  = '01wertyuioasdfghjklQWERTYUIOASDFGHJKLZXCVBNM@';
+    const CHARS_DIST = '01djeofwe;jfQWERTYUIOASDFGHJKLZXCVBNM@';
+    const CHARS_SRC  = '01djeofwe;jfQWERTYUIOASDFGHJKLZXCVBNM@';
     const DIST_R     = 30;
     const DIST_DECAY = 0.82;
     const HEAT_GAIN  = 1.0;
