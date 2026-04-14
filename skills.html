@@ -14,6 +14,17 @@
     }
     
     #visual { position: fixed; inset: 0; z-index: 1; display: block; }
+    
+    #selectable {
+      position: fixed; inset: 0; z-index: 2;
+      font-family: 'Courier New', monospace;
+      white-space: pre; line-height: 1;
+      color: transparent; background: transparent;
+      cursor: crosshair;
+      user-select: text; -webkit-user-select: text;
+      overflow: hidden;
+    }
+    #selectable::selection { background: rgba(0,229,255,0.3); color: transparent; }
 
     /* Curtain effect overlays */
     .curtain {
@@ -91,6 +102,7 @@
   <div id="curtain-right" class="curtain"></div>
 
   <canvas id="visual"></canvas>
+  <pre id="selectable" aria-label="ASCII art — selectable"></pre>
 
   <div id="hud">
     <div class="hud-text">SECTOR: SKILLS_NET</div>
@@ -108,19 +120,22 @@
     </div>
   </div>
 
-  <script type="module">
-    // Skills Data
+   <script type="module">
     const skillsData = [
-      { id: 'frontend', title: 'FRONTEND', desc: 'Crafting immersive, high-performance interfaces with modern frameworks and web APIs.', tools: 'REACT // NEXT.JS // TYPESCRIPT // TAILWIND // THREE.JS', pos: {x: 0.35, y: 0.45} },
-      { id: 'backend', title: 'BACKEND', desc: 'Building scalable, secure server-side architectures and APIs.', tools: 'NODE.JS // PYTHON // POSTGRES // REDIS', pos: {x: 0.55, y: 0.25} },
-      { id: 'automation', title: 'AUTOMATION', desc: 'Streamlining workflows and tasks through robust scripting and automation pipelines.', tools: 'BASH // PYTHON // GITHUB ACTIONS // PUPPETEER', pos: {x: 0.55, y: 0.48} },
-      { id: 'system', title: 'SYSTEM DESIGN', desc: 'Architecting end-to-end resilient systems tailored for distributed scale.', tools: 'MICROSERVICES // CACHING // EVENT-DRIVEN // LOAD BALANCING', pos: {x: 0.55, y: 0.58} },
-      { id: 'cloud', title: 'CLOUD', desc: 'Deploying and orchestrating containerized applications on cloud infrastructure.', tools: 'AWS // DOCKER // KUBERNETES // TERRAFORM', pos: {x: 0.50, y: 0.78} }
+      { id: 'frontend', title: 'FRONTEND', desc: 'Crafting immersive, high-performance interfaces with modern frameworks and web APIs.', tools: 'REACT // NEXT.JS // TYPESCRIPT // TAILWIND // THREE.JS' },
+      { id: 'backend', title: 'BACKEND', desc: 'Building scalable, secure server-side architectures and APIs.', tools: 'NODE.JS // PYTHON // POSTGRES // REDIS' },
+      { id: 'automation', title: 'AUTOMATION', desc: 'Streamlining workflows and tasks through robust scripting and automation pipelines.', tools: 'BASH // PYTHON // GITHUB ACTIONS // PUPPETEER' },
+      { id: 'system', title: 'SYSTEM DESIGN', desc: 'Architecting end-to-end resilient systems tailored for distributed scale.', tools: 'MICROSERVICES // CACHING // EVENT-DRIVEN // LOAD BALANCING' },
+      { id: 'cloud', title: 'CLOUD', desc: 'Deploying and orchestrating containerized applications on cloud infrastructure.', tools: 'AWS // DOCKER // KUBERNETES // TERRAFORM' }
     ];
+
+    const images = ['galaxy-1.webp', 'galaxy-2.webp', 'galaxy-3.png', 'galaxy-4.webp', 'galaxy.webp'];
+    const randomImage = images[Math.floor(Math.random() * images.length)];
 
     const FONT_PX = 9;
     const FONT_STR = `${FONT_PX}px "Courier New", Courier, monospace`;
-    const CHARS_SRC = '01jjbdwjlbhefhdewfiweqwdke;edkdewpokewokpewpoewpoewdewd.dkjsxjhsaj>/,!#@$^@*@(eiu3838dasjdsaadssddsadasdaoi;ejqu3n832-c23n-cwpncehpn38uxe7b2ppUIFOHN82893288938973HJUDLKJSDKJLNNiuospewp8c3p8mc48mp348ymp34c8mp34c8mp94cpmc4pm734789782664782426C7QY47Q4Y@'; // density ramp
+    const CHARS_SRC = '01djeofwe;jfQWERTYUIOASDFGHJKLZXCVBNM@'; 
+    const CHARS_DIST = '@01#$%&*!?+=-_~:;., '; // Natural distortion characters
     
     let charW = FONT_PX * 0.601;
     const charH = FONT_PX;
@@ -129,90 +144,194 @@
     oc.font = FONT_STR;
     charW = oc.measureText('X'.repeat(50)).width / 50;
 
-    let W = window.innerWidth;
-    let H = window.innerHeight;
-    let cols = Math.floor(W / charW);
-    let rows = Math.floor(H / charH);
-    let N = cols * rows;
-
+    let W, H, cols, rows, N;
+    let origChars, colR, colG, colB;
+    
     const canvas = document.getElementById('visual');
-    canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
-    ctx.font = FONT_STR;
-    ctx.textBaseline = 'top';
-
-    let origChars = new Uint8Array(N);
-    let colR = new Uint8Array(N);
-    let colG = new Uint8Array(N);
-    let colB = new Uint8Array(N);
+    const pre = document.getElementById('selectable');
+    const imgObj = new Image();
+    imgObj.crossOrigin = 'anonymous';
 
     // Camera
     let cam = { x: 0, y: 0, scale: 1, targetX: 0, targetY: 0, targetScale: 1 };
-    
-    // Core spin angles
     let time = 0;
+    
+    function setupGrid() {
+      W = window.innerWidth;
+      H = window.innerHeight;
+      cols = Math.floor(W / charW);
+      rows = Math.floor(H / charH);
+      N = cols * rows;
 
-    await new Promise((res, rej) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        const src = document.createElement('canvas');
-        src.width = cols; src.height = rows;
-        const sx = src.getContext('2d');
-        // keep image proportion? Let's just fill for now to cover space
-        // Or cover proportion
-        const aspect = img.width / img.height;
-        const screenAspect = cols / rows;
-        let dw = cols, dh = rows, dx = 0, dy = 0;
-        if(screenAspect > aspect) { dh = cols / aspect; dy = (rows - dh)/2; }
-        else { dw = rows * aspect; dx = (cols - dw)/2; }
-        
-        sx.drawImage(img, dx, dy, dw, dh);
-        const { data } = sx.getImageData(0, 0, cols, rows);
-        for (let i = 0; i < N; i++) {
-          const p = i*4;
-          colR[i] = data[p]; colG[i] = data[p+1]; colB[i] = data[p+2];
+      canvas.width = W; 
+      canvas.height = H;
+      ctx.font = FONT_STR;
+      ctx.textBaseline = 'top';
+      
+      pre.style.fontSize = `${FONT_PX}px`;
+      pre.style.lineHeight = `${charH}px`;
+      pre.style.letterSpacing = '0px';
+
+      origChars = new Uint8Array(N);
+      colR = new Uint8Array(N);
+      colG = new Uint8Array(N);
+      colB = new Uint8Array(N);
+
+      if (!imgObj.complete || imgObj.naturalWidth === 0) return;
+
+      const src = document.createElement('canvas');
+      src.width = cols; src.height = rows;
+      const sx = src.getContext('2d');
+      
+      const aspect = imgObj.naturalWidth / imgObj.naturalHeight;
+      const screenAspect = cols / rows;
+      let dw = cols, dh = rows, dx = 0, dy = 0;
+      if(screenAspect > aspect) { dh = cols / aspect; dy = (rows - dh)/2; }
+      else { dw = rows * aspect; dx = (cols - dw)/2; }
+      
+      sx.drawImage(imgObj, dx, dy, dw, dh);
+      const { data } = sx.getImageData(0, 0, cols, rows);
+      
+      let brightnessMap = new Float32Array(N);
+      let textContent = '';
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const idx = r*cols + c;
+          const p = idx*4;
+          colR[idx] = data[p]; colG[idx] = data[p+1]; colB[idx] = data[p+2];
           const b = 0.299*data[p] + 0.587*data[p+1] + 0.114*data[p+2];
-          origChars[i] = Math.floor((b/255)*(CHARS_SRC.length-1));
+          
+          let chIdx = Math.floor((b/255)*(CHARS_SRC.length-1));
+          origChars[idx] = chIdx;
+          textContent += CHARS_SRC[chIdx];
+          brightnessMap[idx] = b;
         }
-        res();
-      };
-      img.onerror = rej;
-      img.src = 'galaxy.webp';
-    });
+        textContent += '\n';
+      }
+      pre.textContent = textContent;
+
+      let peaks = [];
+      let radius = Math.floor(Math.min(cols, rows) / 5); 
+      
+      for(let k=0; k<5; k++) {
+          let maxB = -1;
+          let maxIdx = -1;
+          for(let i=0; i<N; i++) {
+              if(brightnessMap[i] > maxB) {
+                  let c = i % cols;
+                  let r = Math.floor(i / cols);
+                  if(c > radius && c < cols-radius && r > radius && r < rows-radius) {
+                      maxB = brightnessMap[i];
+                      maxIdx = i;
+                  }
+              }
+          }
+          if(maxIdx === -1) break;
+          
+          let pCol = maxIdx % cols;
+          let pRow = Math.floor(maxIdx / cols);
+          peaks.push({c: pCol, r: pRow});
+          
+          for(let r = pRow - radius; r <= pRow + radius; r++) {
+              for(let c = pCol - radius; c <= pCol + radius; c++) {
+                  if (r>=0 && r<rows && c>=0 && c<cols) {
+                     if(Math.sqrt((r-pRow)**2 + (c-pCol)**2) < radius) {
+                         brightnessMap[r*cols + c] = -1;
+                     }
+                  }
+              }
+          }
+      }
+      
+      for(let k=0; k<skillsData.length; k++) {
+          if(peaks[k]) {
+              skillsData[k].pos = {x: peaks[k].c / cols, y: peaks[k].r / rows};
+              
+              let idx = peaks[k].r * cols + peaks[k].c;
+              let r = colR[idx];
+              let g = colG[idx];
+              let b = colB[idx];
+              
+              let maxChan = Math.max(r, g, b, 1);
+              let mult = 255 / maxChan;
+              let themeR = Math.min(255, Math.floor(r * mult * 0.85 + 40));
+              let themeG = Math.min(255, Math.floor(g * mult * 0.85 + 40));
+              let themeB = Math.min(255, Math.floor(b * mult * 0.85 + 40));
+              
+              if (Math.abs(themeR-themeG) < 20 && Math.abs(themeG-themeB) < 20) {
+                  const fallbacks = [
+                      [0, 229, 255], [124, 58, 237], [16, 185, 129], [255, 60, 100], [255, 180, 0]
+                  ];
+                  [themeR, themeG, themeB] = fallbacks[k % fallbacks.length];
+              }
+              
+              skillsData[k].color = `rgb(${themeR}, ${themeG}, ${themeB})`;
+              skillsData[k].glow  = `rgba(${themeR}, ${themeG}, ${themeB}, 0.5)`;
+          } else {
+              skillsData[k].pos = {x: 0.5, y: 0.5};
+              skillsData[k].color = '#00e5ff';
+              skillsData[k].glow = 'rgba(0,229,255,0.5)';
+          }
+      }
+    }
+
+    imgObj.onload = () => {
+      setupGrid();
+      // Start curtain unlock
+      setTimeout(() => { document.body.classList.add('loaded'); }, 100);
+    };
+    imgObj.src = randomImage;
 
     // Handle Resize
-    // Skipping full dynamic resize for simplicity here, but can be added. 
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(setupGrid, 200);
+    });
 
     let mx = -999, my = -999;
     document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+    document.addEventListener('mouseleave', () => { mx = -999, my = -999 });
 
     let activeSkill = null;
     const modal = document.getElementById('skill-detail');
+    const modalTitle = document.getElementById('modal-title');
+    const modalTools = document.getElementById('modal-tools');
+    const modalDesc = document.getElementById('modal-desc');
+    const skillCard = document.querySelector('.skill-card');
     
-    canvas.addEventListener('click', () => {
-      if(activeSkill !== null) return;
+    // Listen on pre to avoid overlapping issues
+    pre.addEventListener('click', () => {
+      if(activeSkill !== null || !N) return;
       
       const mCol = mx / charW;
       const mRow = my / charH;
 
       for(let s of skillsData) {
+        if(!s.pos) continue;
         const cCol = s.pos.x * cols;
         const cRow = s.pos.y * rows;
-        const distCol = (cCol - mCol);
-        const distRow = (cRow - mRow);
-        const dist = Math.sqrt(distCol*distCol*charW*charW + distRow*distRow*charH*charH);
         
-        if(dist < 50) {
-          // clicked this core!
-          cam.targetScale = 3;
+        const distCol = (cCol - mCol);
+        const distRow = (cRow - mRow) * (charH/charW);
+        const dist = Math.sqrt(distCol*distCol + distRow*distRow);
+        
+        if(dist < 15) { 
+          cam.targetScale = 3.5;
           cam.targetX = cCol * charW;
           cam.targetY = cRow * charH;
           activeSkill = s;
           
-          document.getElementById('modal-title').innerText = s.title;
-          document.getElementById('modal-tools').innerText = s.tools;
-          document.getElementById('modal-desc').innerText = s.desc;
+          modalTitle.innerText = s.title;
+          modalTools.innerText = s.tools;
+          modalDesc.innerText = s.desc;
+          
+          modalTitle.style.color = s.color;
+          modalTitle.style.textShadow = `0 0 15px ${s.glow}`;
+          skillCard.style.borderColor = s.glow;
+          skillCard.style.boxShadow = `0 0 40px ${s.glow}`;
           
           setTimeout(() => { modal.classList.add('active'); }, 600);
           break;
@@ -228,8 +347,14 @@
       cam.targetY = 0;
     });
 
+    const randChar = () => CHARS_DIST[Math.floor(Math.random()*CHARS_DIST.length)];
+
     function frame() {
-      // Lerp camera
+      if(!N) {
+        requestAnimationFrame(frame);
+        return;
+      }
+
       cam.scale += (cam.targetScale - cam.scale) * 0.05;
       if(cam.targetScale === 1) {
         cam.x += (0 - cam.x) * 0.05;
@@ -258,43 +383,30 @@
         for (let c = 0; c < cols; c++) {
           const idx = r*cols+c;
           
-          // only draw cells within viewport bounds after transform? 
-          // For now, draw all since N is not insanely large, or optimize.
-          // Optimization: skip if out of view
           const screenX = cam.x + c * charW * cam.scale;
           const screenY = cam.y + r * charH * cam.scale;
           if (screenX < -20 || screenX > W+20 || screenY < -20 || screenY > H+20) continue;
 
           let ch = CHARS_SRC[origChars[idx]];
-          let isCore = false;
-          let coreDist = 999;
           
-          // check distance to cores for spin/hover effect
-          for (let s of skillsData) {
-            const cc = s.pos.x * cols;
-            const cr = s.pos.y * rows;
-            const dCol = c - cc;
-            const dRow = r - cr;
-            const dist = Math.sqrt(dCol*dCol + dRow*dRow);
-            if(dist < coreDist) coreDist = dist;
-            
-            if(dist < 5) {
-              if (Math.random() < 0.1) ch = '*';
-            }
-          }
+          let r_ = colR[idx];
+          let g_ = colG[idx];
+          let b_ = colB[idx];
           
-          const boost = Math.max(0, (10 - coreDist)) * 10;
-          let r_ = Math.min(255, colR[idx] + boost) | 0;
-          let g_ = Math.min(255, colG[idx] + boost) | 0;
-          let b_ = Math.min(255, colB[idx] + boost) | 0;
-          
-          // Hover target
-          const distToMouse = Math.sqrt(Math.pow(c - mCol, 2)*charW*charW + Math.pow(r - mRow, 2)*charH*charH);
-          if (coreDist < 8 && distToMouse < 40 && cam.targetScale === 1) {
-            r_ = Math.min(255, r_ + 50);
-            g_ = Math.min(255, g_ + 150);
-            b_ = Math.min(255, b_ + 250);
-            if(Math.random() < 0.3) ch = '@';
+          // Hover effect natural distortion like home
+          const dx = (c + 0.5) - mCol;
+          const dy = (r + 0.5) - mRow;
+          const distToMouse = Math.sqrt(dx*dx + dy*dy) * charW;
+          const DIST_R = 30;
+
+          if (distToMouse < DIST_R && cam.targetScale === 1) {
+             const h = Math.pow(1 - distToMouse/DIST_R, 2);
+             if (h > 0.05 && Math.random() < h) ch = randChar();
+             
+             const boost = h * 180;
+             r_ = Math.min(255, r_ + boost*0.6) | 0;
+             g_ = Math.min(255, g_ + boost*0.9) | 0;
+             b_ = Math.min(255, b_ + boost*0.7) | 0;
           }
 
           if (r_ > 10 || g_ > 10 || b_ > 10) {
@@ -304,38 +416,40 @@
         }
       }
       
-      // Draw labels above cores if zoom=1
+      // Draw big font labels
       if(cam.scale < 1.1) {
-        ctx.font = `bold ${FONT_PX+1}px "JetBrains Mono"`;
+        pre.style.cursor = 'default';
         for(let s of skillsData) {
-          const x = s.pos.x * cols * charW;
-          const y = s.pos.y * rows * charH;
+          if(!s.pos) continue;
+          const cc = s.pos.x * cols;
+          const cr = s.pos.y * rows;
+          const x = cc * charW;
+          const y = cr * charH;
           
-          const distToMouse = Math.sqrt(Math.pow(s.pos.x*cols - mCol, 2)*charW*charW + Math.pow(s.pos.y*rows - mRow, 2)*charH*charH);
-          if (distToMouse < 40) {
-            ctx.fillStyle = '#00e5ff';
-            ctx.fillText(`[ ${s.title} ]`, x + 15, y - 10);
-            canvas.style.cursor = 'pointer';
+          const dx = cc - mCol;
+          const dy = cr - mRow;
+          const distToMouse = Math.sqrt(dx*dx + dy*dy*(charH/charW));
+          
+          if (distToMouse < 18) {
+            ctx.font = `bold 42px "Space Grotesk"`;
+            ctx.fillStyle = s.color;
+            ctx.shadowColor = s.color;
+            ctx.shadowBlur = 15;
+            ctx.fillText(` ${s.title} `, x, y);
+            ctx.shadowBlur = 0;
+            ctx.font = FONT_STR; // reset
+            pre.style.cursor = 'pointer';
           }
         }
-        ctx.font = FONT_STR; // reset
       } else {
-        canvas.style.cursor = 'crosshair';
+        pre.style.cursor = 'crosshair';
       }
 
       ctx.restore();
-      
-      if(activeSkill) {
-        // static noise or overlay effect?
-      }
-
       requestAnimationFrame(frame);
     }
     
     requestAnimationFrame(frame);
-    
-    // Start curtain unlock
-    setTimeout(() => { document.body.classList.add('loaded'); }, 100);
 
   </script>
 </body>

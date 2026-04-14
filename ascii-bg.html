@@ -264,64 +264,71 @@
       charW    = oc.measureText('X'.repeat(50)).width / 50;
     }
 
-    // ── Grid ─────────────────────────────────────────────────────
-    const W    = window.innerWidth;
-    const H    = window.innerHeight;
-    const cols = Math.floor(W / charW);
-    const rows = Math.floor(H / charH);
-    const N    = cols * rows;
-
-    // ── Pre overlay font ─────────────────────────────────────────
+    let W, H, cols, rows, N, heat;
+    let origChars, colR, colG, colB;
+    
     const pre = document.getElementById('selectable');
-    pre.style.fontSize      = `${FONT_PX}px`;
-    pre.style.lineHeight    = `${charH}px`;
-    pre.style.letterSpacing = '0px';
+    const canvas = document.getElementById('visual');
+    const ctx = canvas.getContext('2d');
+    const imgObj = new Image();
+    imgObj.crossOrigin = 'anonymous';
 
-    // ── Sample image ─────────────────────────────────────────────
-    const origChars = new Uint8Array(N);
-    const colR = new Uint8Array(N);
-    const colG = new Uint8Array(N);
-    const colB = new Uint8Array(N);
+    function setupGrid() {
+      W = window.innerWidth;
+      H = window.innerHeight;
+      cols = Math.floor(W / charW);
+      rows = Math.floor(H / charH);
+      N = cols * rows;
 
-    await new Promise((res, rej) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        const src = document.createElement('canvas');
-        src.width = cols; src.height = rows;
-        const sx  = src.getContext('2d');
-        sx.drawImage(img, 0, 0, cols, rows);
-        const { data } = sx.getImageData(0, 0, cols, rows);
-        for (let i = 0; i < N; i++) {
-          const p = i*4;
-          colR[i] = data[p]; colG[i] = data[p+1]; colB[i] = data[p+2];
-          const b = 0.299*data[p] + 0.587*data[p+1] + 0.114*data[p+2];
-          origChars[i] = Math.floor((b/255)*(CHARS_SRC.length-1));
-        }
-        res();
-      };
-      img.onerror = rej;
-      img.src = 'home-original.webp';
-    });
+      pre.style.fontSize      = `${FONT_PX}px`;
+      pre.style.lineHeight    = `${charH}px`;
+      pre.style.letterSpacing = '0px';
 
-    // ── Selectable pre content ────────────────────────────────────
-    {
+      origChars = new Uint8Array(N);
+      colR = new Uint8Array(N);
+      colG = new Uint8Array(N);
+      colB = new Uint8Array(N);
+      heat = new Float32Array(N);
+      
+      canvas.width = W; 
+      canvas.height = H;
+      ctx.font = FONT_STR;
+      ctx.textBaseline = 'top';
+
+      if(!imgObj.complete || imgObj.naturalWidth === 0) return;
+
+      const src = document.createElement('canvas');
+      src.width = cols; src.height = rows;
+      const sx  = src.getContext('2d');
+      
+      // Reverting to strict stretch to ensure the full image is visible
+      sx.drawImage(imgObj, 0, 0, cols, rows);
+      const { data } = sx.getImageData(0, 0, cols, rows);
+      
       let txt = '';
       for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) txt += CHARS_SRC[origChars[r*cols+c]];
+        for (let c = 0; c < cols; c++) {
+          const idx = r*cols + c;
+          const p = idx*4;
+          colR[idx] = data[p]; colG[idx] = data[p+1]; colB[idx] = data[p+2];
+          const b = 0.299*data[p] + 0.587*data[p+1] + 0.114*data[p+2];
+          const chIdx = Math.floor((b/255)*(CHARS_SRC.length-1));
+          origChars[idx] = chIdx;
+          txt += CHARS_SRC[chIdx];
+        }
         txt += '\n';
       }
       pre.textContent = txt;
     }
 
-    // ── Canvas ───────────────────────────────────────────────────
-    const canvas = document.getElementById('visual');
-    canvas.width = W; canvas.height = H;
-    const ctx = canvas.getContext('2d');
-    ctx.font = FONT_STR;
-    ctx.textBaseline = 'top';
-
-    const heat = new Float32Array(N);
+    imgObj.onload = setupGrid;
+    imgObj.src = 'home-original.webp';
+    
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(setupGrid, 200);
+    });
     let mx = -9999, my = -9999;
     document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
     document.addEventListener('mouseleave', () => { mx = -9999; my = -9999; });
@@ -329,6 +336,10 @@
     const randChar = () => CHARS_DIST[Math.floor(Math.random()*CHARS_DIST.length)];
 
     function frame() {
+      if (!N) {
+        requestAnimationFrame(frame);
+        return;
+      }
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, W, H);
       const mCol = mx / charW;
