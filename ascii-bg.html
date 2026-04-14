@@ -551,8 +551,16 @@
           // Normalised distance from cut: 0 = AT the cut tip, 1 = leftmost point
           const s = cutX > 0 ? (cutX - x) / cutX : 1;
 
-          // Asymptotic curl curve!
-          const curl = Math.pow(s, 0.25);
+          // ── Astroid Curve Physics ──
+          // The user specifically requested an Astroid curve (x^(2/3) + y^(2/3) = 1)
+          // We map the cut tip (s=0) to the x-axis cusp (x=1, y=0).
+          // And the far tail (s=1) to the y-axis cusp (x=0, y=1).
+          // Therefore x_astroid = 1 - s.
+          // Solving for y_astroid yields: y = (1 - x^(2/3))^(3/2).
+          const x_astroid = 1 - s;
+          const s23 = Math.pow(x_astroid, 2 / 3);
+          const curl = Math.pow(1 - s23, 1.5);
+          
           const yOff = MAX_PEEL * peelFactor * curl;
 
           // Dim the tightly coiled areas near the cut to simulate shading
