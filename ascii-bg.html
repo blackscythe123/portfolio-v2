@@ -337,6 +337,9 @@
 
     // Blast mechanic
     document.addEventListener('click', (e) => {
+      const tag = e.target.tagName.toLowerCase();
+      if (tag === 'button' || tag === 'a' || e.target.closest('a') || e.target.closest('button')) return;
+      
       if(!N) return;
       const bc = Math.floor(e.clientX / charW);
       const br = Math.floor(e.clientY / charH);
