@@ -483,173 +483,136 @@
       isTearRunning = true;
       deleting = true;
 
-      // 1. Snapshot the live ASCII canvas into an ImageBitmap
+      // Snapshot the live ASCII canvas frame into GPU-resident ImageBitmap
       const bitmap = await createImageBitmap(canvas);
 
-      // 2. Build the jagged tear path along vertical center
-      //    This stays fixed for the whole animation
-      const tearPath = [];
-      const steps = 120;
-      let jy = H / 2;
-      for (let i = 0; i <= steps; i++) {
-        const x = (i / steps) * W;
-        // Multi-frequency jagged noise
-        jy += (Math.random() - 0.5) * 28;
-        jy = Math.max(H * 0.35, Math.min(H * 0.65, jy));
-        tearPath.push({ x, y: jy });
-      }
-
-      // 3. Create a full-screen overlay canvas sitting above everything
+      // Full-screen overlay canvas — sits above everything including HTML overlay
       const oc = document.createElement('canvas');
       oc.width = W; oc.height = H;
       oc.style.cssText = 'position:fixed;inset:0;z-index:99999;pointer-events:none;';
       document.body.appendChild(oc);
       const ox = oc.getContext('2d');
 
-      // Also instantly hide the HTML overlay so it doesn't float awkwardly
-      document.getElementById('overlay').style.opacity = '0';
-      document.getElementById('overlay').style.transition = 'opacity 0.05s';
+      // Instantly fade out the HTML text/button overlay
+      document.getElementById('overlay').style.cssText += ';opacity:0;transition:opacity 0.08s;';
 
-      // 4. Progressive tear animation
-      const tearDuration = 1200; // ms to cut left to right
-      const splitDuration = 600; // ms for halves to fly apart after cut reaches end
+      // ── ASYMPTOTIC SCROLL-CURL PHYSICS ────────────────────────────
+      // The key: render ~3px-wide vertical strips.
+      // Each strip at distance d from the cutting tip uses:
+      //   curl(d) = (d / cutX) ^ 0.25
+      // This is a steep power curve:
+      //   d≈0 (just past cut tip): slope is nearly vertical → tight spiral curl
+      //   d=10% of cut area: curl ≈ 0.56 (already 56% peeled)
+      //   d=100% (left edge): curl = 1.0 (fully unrolled, maximum displacement)
+      // Top strips fly up, bottom strips fly down.
+      // Result: material RIGHT AT THE CUT EDGE curls into a tight inward spiral;
+      // material cut long ago has fully unrolled and is flying off-screen.
+
+      const STRIP_W = 3;             // px width of each vertical strip
+      const CUT_DURATION  = 2600;    // ms for scissor to sweep left → right
+      const TOTAL_DURATION = 3800;   // ms total before redirect
+      const MAX_PEEL = H * 1.3;      // displacement beyond which a strip is off-screen
+
       const startTime = performance.now();
       let done = false;
 
-      function drawTearFrame(now) {
+      function drawFrame(now) {
         if (done) return;
         const elapsed = now - startTime;
 
-        // How far across has the cut progressed? (0 to W)
-        const cutProgress = Math.min(1, elapsed / tearDuration);
+        // ── Cut sweep progress (ease-in so it starts gently) ──
+        const rawP = Math.min(1, elapsed / CUT_DURATION);
+        const cutProgress = rawP * rawP; // quadratic ease-in
         const cutX = cutProgress * W;
 
-        // How much have the fully-cut sections opened? (0..1 after cut reaches end)
-        const splitProgress = cutProgress < 1
-          ? 0
-          : Math.min(1, (elapsed - tearDuration) / splitDuration);
+        // ── Global peel factor (smoothstep across full duration) ──
+        const peelT = Math.min(1, elapsed / TOTAL_DURATION);
+        const peelFactor = peelT * peelT * (3 - 2 * peelT);
 
-        // Ease out for the split phase
-        const splitEase = 1 - Math.pow(1 - splitProgress, 3);
-        const maxPeel = H * 0.75;
-
-        ox.clearRect(0, 0, W, H);
+        // Black background
         ox.fillStyle = '#000';
         ox.fillRect(0, 0, W, H);
 
-        // -- Draw the uncut right portion normally --
+        // ── Right of cut: draw untouched image ──
         if (cutX < W) {
           ox.save();
           ox.beginPath();
-          // Right of the cut line: top+bottom tear points on the right are at center
-          ox.moveTo(W, 0);
-          ox.lineTo(cutX, 0);
-          // Walk tear path from left to the cut point
-          for (let i = 0; i < tearPath.length; i++) {
-            if (tearPath[i].x <= cutX) {
-              ox.lineTo(tearPath[i].x, tearPath[i].y);
-            } else break;
-          }
-          ox.lineTo(cutX, H);
-          ox.lineTo(W, H);
-          ox.closePath();
+          ox.rect(cutX, 0, W - cutX, H);
           ox.clip();
-          ox.drawImage(bitmap, 0, 0);
+          ox.drawImage(bitmap, 0, 0, W, H);
           ox.restore();
         }
 
-        // -- Draw TOP half (left of cut): peeling UP --
-        (() => {
+        // ── Per-strip asymptotic scroll curl ──
+        for (let x = 0; x < cutX; x += STRIP_W) {
+          const sw = Math.min(STRIP_W + 1, cutX - x); // strip width
+          if (sw <= 0) continue;
+
+          // Normalised distance from cut: 0 = AT the cut tip, 1 = leftmost point
+          const s = cutX > 0 ? (cutX - x) / cutX : 1;
+
+          // Asymptotic curl curve!
+          const curl = Math.pow(s, 0.25);
+          const yOff = MAX_PEEL * peelFactor * curl;
+
+          // Dim the tightly coiled areas near the cut to simulate shading
+          ox.globalAlpha = 0.65 + 0.35 * curl;
+
+          // TOP half strip
           ox.save();
           ox.beginPath();
-          ox.moveTo(0, 0);
-          ox.lineTo(cutX, 0);
-          // Walk tear path up to current cut
-          for (let i = 0; i < tearPath.length; i++) {
-            if (tearPath[i].x <= cutX) ox.lineTo(tearPath[i].x, tearPath[i].y);
-            else break;
-          }
-          // Close along the left edge
-          ox.lineTo(0, H / 2);
-          ox.closePath();
-
-          // Peel amount: further from cutX = more peeled
-          // We translate the whole half up by splitEase amount
-          const peelY = -splitEase * maxPeel;
-          ox.translate(0, peelY);
+          ox.rect(x, 0, sw, H / 2);
           ox.clip();
-          ox.drawImage(bitmap, 0, 0);
+          ox.transform(1, 0, 0, 1, 0, -yOff);
+          ox.drawImage(bitmap, x, 0, sw, H / 2, x, 0, sw, H / 2);
           ox.restore();
 
-          // Bright jagged tear edge on top half
-          ox.save();
-          ox.translate(0, -splitEase * maxPeel);
-          ox.beginPath();
-          ox.moveTo(0, H / 2);
-          for (let i = 0; i < tearPath.length; i++) {
-            if (tearPath[i].x > cutX) break;
-            ox.lineTo(tearPath[i].x, tearPath[i].y);
-          }
-          ox.strokeStyle = `rgba(200,230,255,${0.9 - splitEase * 0.6})`;
-          ox.lineWidth = 1.5;
-          ox.stroke();
-          ox.restore();
-        })();
-
-        // -- Draw BOTTOM half (left of cut): peeling DOWN --
-        (() => {
+          // BOTTOM half strip
           ox.save();
           ox.beginPath();
-          ox.moveTo(0, H);
-          ox.lineTo(cutX, H);
-          // Walk tear path (bottom portion below tear line)
-          for (let i = tearPath.length - 1; i >= 0; i--) {
-            if (tearPath[i].x <= cutX) ox.lineTo(tearPath[i].x, tearPath[i].y);
-          }
-          ox.lineTo(0, H / 2);
-          ox.closePath();
-
-          const peelY = splitEase * maxPeel;
-          ox.translate(0, peelY);
+          ox.rect(x, H / 2, sw, H / 2);
           ox.clip();
-          ox.drawImage(bitmap, 0, 0);
+          ox.transform(1, 0, 0, 1, 0, yOff);
+          ox.drawImage(bitmap, x, H / 2, sw, H / 2, x, H / 2, sw, H / 2);
           ox.restore();
-        })();
+        }
 
-        // -- Glowing cut line at current cut position --
-        if (cutProgress < 1) {
+        ox.globalAlpha = 1;
+
+        // ── Glowing scissor tip at the moving cut point ──
+        if (cutProgress > 0.005 && cutProgress < 0.995) {
           const cx = cutX;
-          // Find current tear Y at cut
-          let currY = H / 2;
-          for (let i = tearPath.length - 1; i >= 0; i--) {
-            if (tearPath[i].x <= cx) { currY = tearPath[i].y; break; }
-          }
-          // Vertical glowing slash
-          const grad = ox.createLinearGradient(cx, 0, cx, H);
-          grad.addColorStop(0, 'rgba(0,229,255,0)');
-          grad.addColorStop(currY / H - 0.04, 'rgba(0,229,255,0)');
-          grad.addColorStop(currY / H, 'rgba(255,255,255,0.95)');
-          grad.addColorStop(currY / H + 0.04, 'rgba(0,229,255,0)');
-          grad.addColorStop(1, 'rgba(0,229,255,0)');
-          ox.strokeStyle = grad;
-          ox.lineWidth = 3;
+          const cy = H / 2;
+
+          const grd = ox.createRadialGradient(cx, cy, 0, cx, cy, 55);
+          grd.addColorStop(0,   'rgba(0,255,210,0.75)');
+          grd.addColorStop(0.35,'rgba(0,229,255,0.3)');
+          grd.addColorStop(1,   'rgba(0,229,255,0)');
+          
+          ox.fillStyle = grd;
           ox.beginPath();
-          ox.moveTo(cx, 0);
-          ox.lineTo(cx, H);
+          ox.arc(cx, cy, 55, 0, Math.PI * 2);
+          ox.fill();
+
+          ox.strokeStyle = 'rgba(255,255,255,0.85)';
+          ox.lineWidth = 1.5;
+          ox.beginPath();
+          ox.moveTo(cx, cy - 18);
+          ox.lineTo(cx, cy + 18);
           ox.stroke();
         }
 
-        // Navigate as soon as both halves have fully flown apart
-        if (splitProgress >= 1) {
+        // Navigate when done
+        if (elapsed >= TOTAL_DURATION) {
           done = true;
           window.location.href = 'skills.html';
           return;
         }
 
-        requestAnimationFrame(drawTearFrame);
+        requestAnimationFrame(drawFrame);
       }
 
-      requestAnimationFrame(drawTearFrame);
+      requestAnimationFrame(drawFrame);
     });
   </script>
 </body>
