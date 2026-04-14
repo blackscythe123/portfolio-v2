@@ -265,7 +265,7 @@
     }
 
     let W, H, cols, rows, N, heat;
-    let origChars, colR, colG, colB;
+    let origChars, gridChars, colR, colG, colB;
     
     const pre = document.getElementById('selectable');
     const canvas = document.getElementById('visual');
@@ -284,7 +284,8 @@
       pre.style.lineHeight    = `${charH}px`;
       pre.style.letterSpacing = '0px';
 
-      origChars = new Uint8Array(N);
+      origChars = new Int16Array(N);
+      gridChars = new Int16Array(N);
       colR = new Uint8Array(N);
       colG = new Uint8Array(N);
       colB = new Uint8Array(N);
@@ -314,6 +315,7 @@
           const b = 0.299*data[p] + 0.587*data[p+1] + 0.114*data[p+2];
           const chIdx = Math.floor((b/255)*(CHARS_SRC.length-1));
           origChars[idx] = chIdx;
+          gridChars[idx] = chIdx;
           txt += CHARS_SRC[chIdx];
         }
         txt += '\n';
@@ -333,6 +335,27 @@
     document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
     document.addEventListener('mouseleave', () => { mx = -9999; my = -9999; });
 
+    // Blast mechanic
+    document.addEventListener('click', (e) => {
+      if(!N) return;
+      const bc = Math.floor(e.clientX / charW);
+      const br = Math.floor(e.clientY / charH);
+      const radius = 12; // Blast radius in cells
+      for(let r = br - radius; r <= br + radius; r++) {
+        for(let c = bc - radius; c <= bc + radius; c++) {
+          if (r>=0 && r<rows && c>=0 && c<cols) {
+            const dist = Math.sqrt((c-bc)**2 + (r-br)**2 * Math.pow(charH/charW, 2));
+            if (dist <= radius) {
+                const idx = r*cols + c;
+                gridChars[idx] = -1; // Blow hole
+                // Optional: set high heat for blast ring
+                if (dist > radius - 2) heat[idx] = 1.0;
+            }
+          }
+        }
+      }
+    });
+
     const randChar = () => CHARS_DIST[Math.floor(Math.random()*CHARS_DIST.length)];
 
     function frame() {
@@ -340,6 +363,41 @@
         requestAnimationFrame(frame);
         return;
       }
+      
+      // Physics gravity simulation
+      let gridChanged = false;
+      for (let c = 0; c < cols; c++) {
+          // Bottom-up evaluation per column
+          for (let r = rows - 1; r > 0; r--) {
+              const idx = r*cols + c;
+              if (gridChars[idx] === -1) {
+                  const idxAbove = (r-1)*cols + c;
+                  if (gridChars[idxAbove] !== -1) {
+                      gridChars[idx] = gridChars[idxAbove];
+                      gridChars[idxAbove] = -1;
+                      gridChanged = true;
+                  }
+              }
+          }
+          // Spawner row (falls from the top)
+          if (gridChars[c] === -1) {
+              gridChars[c] = origChars[c]; // heal image
+              gridChanged = true;
+          }
+      }
+      
+      if (gridChanged) {
+         let txt = '';
+         for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+               const chIdx = gridChars[r*cols+c];
+               txt += chIdx === -1 ? ' ' : CHARS_SRC[chIdx];
+            }
+            txt += '\n';
+         }
+         pre.textContent = txt;
+      }
+
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, W, H);
       const mCol = mx / charW;
@@ -349,6 +407,9 @@
         const y = r * charH;
         for (let c = 0; c < cols; c++) {
           const idx = r*cols+c;
+          
+          if (gridChars[idx] === -1) continue; // the void
+          
           const dx  = (c+0.5) - mCol;
           const dy  = (r+0.5) - mRow;
           const dist = Math.sqrt(dx*dx + dy*dy) * charW;
@@ -360,7 +421,7 @@
           heat[idx] *= DIST_DECAY;
           const h = heat[idx];
 
-          const ch = (h > 0.05 && Math.random() < h) ? randChar() : CHARS_SRC[origChars[idx]];
+          const ch = (h > 0.05 && Math.random() < h) ? randChar() : CHARS_SRC[gridChars[idx]];
           const boost = h * 180;
           const r_ = Math.min(255, colR[idx] + boost*0.6)|0;
           const g_ = Math.min(255, colG[idx] + boost*0.9)|0;
