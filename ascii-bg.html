@@ -241,8 +241,8 @@
     // ── Config ───────────────────────────────────────────────────
     const FONT_PX    = 9;
     const FONT_STR   = `${FONT_PX}px "Courier New", Courier, monospace`;
-    const CHARS_DIST = '01djeofwe;jfQWERTYUIOASDFGHJKLZXCVBNM@';
-    const CHARS_SRC  = '01djeofwe;jfQWERTYUIOASDFGHJKLZXCVBNM@';
+    const CHARS_DIST = '01jfQWERTYUIOASDFGHJKLZXCVBNM@';
+    const CHARS_SRC  = '01jfQWERTYUIOASDFGHJKLZXCVBNM@';
     const DIST_R     = 30;
     const DIST_DECAY = 0.82;
     const HEAT_GAIN  = 1.0;
@@ -266,6 +266,7 @@
 
     let W, H, cols, rows, N, heat;
     let origChars, gridChars, colR, colG, colB;
+    let isTearRunning = false;
     
     const pre = document.getElementById('selectable');
     const canvas = document.getElementById('visual');
@@ -383,11 +384,12 @@
               }
           }
           // Spawner row (falls from the top)
-          if (gridChars[c] === -1) {
-              gridChars[c] = origChars[c]; // heal image
+      if (gridChars[c] === -1 && !isTearRunning) {
+              gridChars[c] = origChars[c];
               gridChanged = true;
           }
       }
+      // If tear is running, freeze the ASCII engine silently
       
       if (gridChanged) {
          let txt = '';
@@ -438,7 +440,7 @@
     }
     requestAnimationFrame(frame);
 
-    // ── Typing effect ─────────────────────────────────────────────
+    // ── Typing effect ───────────────────────────────────────────
     const phrases = [
       'make run creative_developer',
       './deploy_full_stack.sh',
@@ -454,10 +456,10 @@
         el.textContent = phrase.slice(0, ci);
         if (ci === phrase.length) {
           deleting = true;
-          setTimeout(typeLoop, 2000); // pause at full phrase
+          setTimeout(typeLoop, 2000);
           return;
         }
-        setTimeout(typeLoop, 50 + Math.random() * 50); // randomized typing speed
+        setTimeout(typeLoop, 50 + Math.random() * 50);
       } else {
         ci--;
         el.textContent = phrase.slice(0, ci);
@@ -467,73 +469,187 @@
           setTimeout(typeLoop, 600);
           return;
         }
-        setTimeout(typeLoop, 20); // fast delete
+        setTimeout(typeLoop, 20);
       }
     }
-    // Start typing after name animation settles
     setTimeout(typeLoop, 1500);
 
-    // ── Transition Effect ─────────────────────────────────────────
+    // ── Scissor Screen Tear Transition ────────────────────────────
     const btnSkills = document.getElementById('btn-skills');
-    btnSkills.addEventListener('click', (e) => {
+
+    btnSkills.addEventListener('click', async (e) => {
       e.preventDefault();
-      
-      // Stop typing
+      if (isTearRunning) return;
+      isTearRunning = true;
       deleting = true;
 
-      // 1. Create Rocket
-      const rocket = document.createElement('div');
-      rocket.textContent = '>>======🚀';
-      rocket.style.position = 'fixed';
-      rocket.style.top = '50%';
-      rocket.style.left = '-150px';
-      rocket.style.transform = 'translateY(-50%)';
-      rocket.style.fontSize = '2rem';
-      rocket.style.color = '#00e5ff';
-      rocket.style.fontFamily = '"JetBrains Mono", monospace';
-      rocket.style.zIndex = '1000';
-      rocket.style.pointerEvents = 'none';
-      rocket.style.transition = 'left 1.2s cubic-bezier(0.8, 0, 0.2, 1)';
-      document.body.appendChild(rocket);
+      // 1. Snapshot the live ASCII canvas into an ImageBitmap
+      const bitmap = await createImageBitmap(canvas);
 
-      // Create two black curtains for the tear
-      const curtainWrapper = document.createElement('div');
-      curtainWrapper.style.position = 'fixed';
-      curtainWrapper.style.inset = '0';
-      curtainWrapper.style.zIndex = '999';
-      curtainWrapper.style.pointerEvents = 'none';
-      curtainWrapper.style.display = 'flex';
-      
-      const c1 = document.createElement('div');
-      const c2 = document.createElement('div');
-      c1.style.width = '50%'; c1.style.height = '100%'; c1.style.background = '#000';
-      c2.style.width = '50%'; c2.style.height = '100%'; c2.style.background = '#000';
-      
-      // Start them open (scaled 0), and then close them tightly behind the rocket
-      c1.style.transformOrigin = 'left';
-      c2.style.transformOrigin = 'right';
-      c1.style.transform = 'scaleX(0)';
-      c2.style.transform = 'scaleX(0)';
-      c1.style.transition = 'transform 0.4s ease-in 0.4s';
-      c2.style.transition = 'transform 0.4s ease-in 0.4s';
-      
-      curtainWrapper.appendChild(c1);
-      curtainWrapper.appendChild(c2);
-      document.body.appendChild(curtainWrapper);
+      // 2. Build the jagged tear path along vertical center
+      //    This stays fixed for the whole animation
+      const tearPath = [];
+      const steps = 120;
+      let jy = H / 2;
+      for (let i = 0; i <= steps; i++) {
+        const x = (i / steps) * W;
+        // Multi-frequency jagged noise
+        jy += (Math.random() - 0.5) * 28;
+        jy = Math.max(H * 0.35, Math.min(H * 0.65, jy));
+        tearPath.push({ x, y: jy });
+      }
 
-      // Launch rocket
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          rocket.style.left = '120vw';
-          c1.style.transform = 'scaleX(1)';
-          c2.style.transform = 'scaleX(1)';
-        });
-      });
+      // 3. Create a full-screen overlay canvas sitting above everything
+      const oc = document.createElement('canvas');
+      oc.width = W; oc.height = H;
+      oc.style.cssText = 'position:fixed;inset:0;z-index:99999;pointer-events:none;';
+      document.body.appendChild(oc);
+      const ox = oc.getContext('2d');
 
-      // Redirect once torn/blacked out
-      setTimeout(() => {
-        window.location.href = 'skills.html';
-      }, 1000);
+      // Also instantly hide the HTML overlay so it doesn't float awkwardly
+      document.getElementById('overlay').style.opacity = '0';
+      document.getElementById('overlay').style.transition = 'opacity 0.05s';
+
+      // 4. Progressive tear animation
+      const tearDuration = 1200; // ms to cut left to right
+      const splitDuration = 600; // ms for halves to fly apart after cut reaches end
+      const startTime = performance.now();
+      let done = false;
+
+      function drawTearFrame(now) {
+        if (done) return;
+        const elapsed = now - startTime;
+
+        // How far across has the cut progressed? (0 to W)
+        const cutProgress = Math.min(1, elapsed / tearDuration);
+        const cutX = cutProgress * W;
+
+        // How much have the fully-cut sections opened? (0..1 after cut reaches end)
+        const splitProgress = cutProgress < 1
+          ? 0
+          : Math.min(1, (elapsed - tearDuration) / splitDuration);
+
+        // Ease out for the split phase
+        const splitEase = 1 - Math.pow(1 - splitProgress, 3);
+        const maxPeel = H * 0.75;
+
+        ox.clearRect(0, 0, W, H);
+        ox.fillStyle = '#000';
+        ox.fillRect(0, 0, W, H);
+
+        // -- Draw the uncut right portion normally --
+        if (cutX < W) {
+          ox.save();
+          ox.beginPath();
+          // Right of the cut line: top+bottom tear points on the right are at center
+          ox.moveTo(W, 0);
+          ox.lineTo(cutX, 0);
+          // Walk tear path from left to the cut point
+          for (let i = 0; i < tearPath.length; i++) {
+            if (tearPath[i].x <= cutX) {
+              ox.lineTo(tearPath[i].x, tearPath[i].y);
+            } else break;
+          }
+          ox.lineTo(cutX, H);
+          ox.lineTo(W, H);
+          ox.closePath();
+          ox.clip();
+          ox.drawImage(bitmap, 0, 0);
+          ox.restore();
+        }
+
+        // -- Draw TOP half (left of cut): peeling UP --
+        (() => {
+          ox.save();
+          ox.beginPath();
+          ox.moveTo(0, 0);
+          ox.lineTo(cutX, 0);
+          // Walk tear path up to current cut
+          for (let i = 0; i < tearPath.length; i++) {
+            if (tearPath[i].x <= cutX) ox.lineTo(tearPath[i].x, tearPath[i].y);
+            else break;
+          }
+          // Close along the left edge
+          ox.lineTo(0, H / 2);
+          ox.closePath();
+
+          // Peel amount: further from cutX = more peeled
+          // We translate the whole half up by splitEase amount
+          const peelY = -splitEase * maxPeel;
+          ox.translate(0, peelY);
+          ox.clip();
+          ox.drawImage(bitmap, 0, 0);
+          ox.restore();
+
+          // Bright jagged tear edge on top half
+          ox.save();
+          ox.translate(0, -splitEase * maxPeel);
+          ox.beginPath();
+          ox.moveTo(0, H / 2);
+          for (let i = 0; i < tearPath.length; i++) {
+            if (tearPath[i].x > cutX) break;
+            ox.lineTo(tearPath[i].x, tearPath[i].y);
+          }
+          ox.strokeStyle = `rgba(200,230,255,${0.9 - splitEase * 0.6})`;
+          ox.lineWidth = 1.5;
+          ox.stroke();
+          ox.restore();
+        })();
+
+        // -- Draw BOTTOM half (left of cut): peeling DOWN --
+        (() => {
+          ox.save();
+          ox.beginPath();
+          ox.moveTo(0, H);
+          ox.lineTo(cutX, H);
+          // Walk tear path (bottom portion below tear line)
+          for (let i = tearPath.length - 1; i >= 0; i--) {
+            if (tearPath[i].x <= cutX) ox.lineTo(tearPath[i].x, tearPath[i].y);
+          }
+          ox.lineTo(0, H / 2);
+          ox.closePath();
+
+          const peelY = splitEase * maxPeel;
+          ox.translate(0, peelY);
+          ox.clip();
+          ox.drawImage(bitmap, 0, 0);
+          ox.restore();
+        })();
+
+        // -- Glowing cut line at current cut position --
+        if (cutProgress < 1) {
+          const cx = cutX;
+          // Find current tear Y at cut
+          let currY = H / 2;
+          for (let i = tearPath.length - 1; i >= 0; i--) {
+            if (tearPath[i].x <= cx) { currY = tearPath[i].y; break; }
+          }
+          // Vertical glowing slash
+          const grad = ox.createLinearGradient(cx, 0, cx, H);
+          grad.addColorStop(0, 'rgba(0,229,255,0)');
+          grad.addColorStop(currY / H - 0.04, 'rgba(0,229,255,0)');
+          grad.addColorStop(currY / H, 'rgba(255,255,255,0.95)');
+          grad.addColorStop(currY / H + 0.04, 'rgba(0,229,255,0)');
+          grad.addColorStop(1, 'rgba(0,229,255,0)');
+          ox.strokeStyle = grad;
+          ox.lineWidth = 3;
+          ox.beginPath();
+          ox.moveTo(cx, 0);
+          ox.lineTo(cx, H);
+          ox.stroke();
+        }
+
+        // Navigate as soon as both halves have fully flown apart
+        if (splitProgress >= 1) {
+          done = true;
+          window.location.href = 'skills.html';
+          return;
+        }
+
+        requestAnimationFrame(drawTearFrame);
+      }
+
+      requestAnimationFrame(drawTearFrame);
     });
   </script>
 </body>
