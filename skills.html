@@ -393,6 +393,34 @@
           let g_ = colG[idx];
           let b_ = colB[idx];
           
+          // --- Ambient core distortion (Pulse so they are visible) ---
+          for (let i = 0; i < skillsData.length; i++) {
+             let s = skillsData[i];
+             if(!s.pos) continue;
+             const cc = s.pos.x * cols;
+             const cr = s.pos.y * rows;
+             const cdx = (c + 0.5) - cc;
+             const cdy = (r + 0.5) - cr;
+             const distToCore = Math.sqrt(cdx*cdx + cdy*cdy * Math.pow(charH/charW, 2));
+             
+             if(distToCore < 8 && cam.targetScale === 1) {
+                const pulse = Math.sin(time*1.5 + i) * 0.5 + 0.5; // 0 to 1 wave
+                const strength = Math.max(0, 1 - distToCore/8) * pulse;
+                
+                if (strength > 0.4 && Math.random() < strength * 0.2) {
+                   ch = randChar(); // slight persistent static
+                }
+                
+                // Color boost based on the semantic theme
+                let rgbParts = s.color.match(/\d+/g);
+                if (rgbParts && rgbParts.length >= 3) {
+                   r_ = Math.min(255, r_ + parseInt(rgbParts[0]) * strength * 0.4) | 0;
+                   g_ = Math.min(255, g_ + parseInt(rgbParts[1]) * strength * 0.4) | 0;
+                   b_ = Math.min(255, b_ + parseInt(rgbParts[2]) * strength * 0.4) | 0;
+                }
+             }
+          }
+          
           // Hover effect natural distortion like home
           const dx = (c + 0.5) - mCol;
           const dy = (r + 0.5) - mRow;
