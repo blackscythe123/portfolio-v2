@@ -1,10 +1,50 @@
 {
   "version": 1,
   "skills": {
+    "3d-modeling": {
+      "source": "omer-metin/skills-for-antigravity",
+      "sourceType": "github",
+      "computedHash": "dd0beea41a5f5711c6a8b209bb2218340ab7afabe26147eb1560e4d26d65f7c5"
+    },
+    "3d-web-experience": {
+      "source": "omer-metin/skills-for-antigravity",
+      "sourceType": "github",
+      "computedHash": "26911aad64d431e169527173e79e567649bfa62aae6c3c418c66499196d4d6b2"
+    },
     "ckm:ui-styling": {
       "source": "nextlevelbuilder/ui-ux-pro-max-skill",
       "sourceType": "github",
       "computedHash": "9ae38e4e201f338b6150e462b98a2db0f2ae7c180c77e8cfb1d33eba9d33bf33"
+    },
+    "color-theory": {
+      "source": "omer-metin/skills-for-antigravity",
+      "sourceType": "github",
+      "computedHash": "6143a2293b645ab4c57431a38452b980a0a8f9f1e65cb1d839cdf9a3f0e4158c"
+    },
+    "frontend": {
+      "source": "omer-metin/skills-for-antigravity",
+      "sourceType": "github",
+      "computedHash": "a6dde136fb2e3056739dda22e618f8a66a6bc6399b5dd9303597838f5c314214"
+    },
+    "game-ai-behavior": {
+      "source": "omer-metin/skills-for-antigravity",
+      "sourceType": "github",
+      "computedHash": "13ff6139af9f12919cbd57658773b92cb593f1a48dd6f64448c52c32639b68d5"
+    },
+    "game-design": {
+      "source": "omer-metin/skills-for-antigravity",
+      "sourceType": "github",
+      "computedHash": "b718cc2e642b144b1d58f1729e733b183081ada806139e3be1b30061600d697e"
+    },
+    "game-ui-design": {
+      "source": "omer-metin/skills-for-antigravity",
+      "sourceType": "github",
+      "computedHash": "cff8acaf58f3f4255f76fb962775fb1a2fec1fce49a54a50bde2c1efd5eb33ec"
+    },
+    "plugin-creator": {
+      "source": "openai/plugins",
+      "sourceType": "github",
+      "computedHash": "7e6c938d097c14df192df17db35cd4cf6b77ab2a5505644806b4971b6a032097"
     },
     "pretext": {
       "source": "yaniv-golan/pretext-skill",
