@@ -157,9 +157,11 @@
       text-transform: uppercase;
       text-decoration: none;
       cursor: pointer;
-      color: rgba(255,255,255,0.85);        /* visible at rest */
+      color: rgba(255,255,255,0.85);
       transition: all 220ms ease;
-      padding: 2px 0;
+      padding: 0.55rem 1.2rem;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.2);
       text-shadow: 0 1px 6px rgba(0,0,0,0.9);
     }
     .btn-num {
@@ -179,6 +181,13 @@
       color: #00e5ff;
       text-shadow: 0 0 10px rgba(0,229,255,0.4);
       transform: translateX(8px);
+      border-color: rgba(0,229,255,0.35);
+      background: rgba(0,229,255,0.04);
+      box-shadow: 0 0 20px rgba(0,229,255,0.08);
+    }
+    .btn:focus-visible {
+      outline: 2px solid #00e5ff;
+      outline-offset: 2px;
     }
     .btn:hover::after {
       color: #00e5ff;
