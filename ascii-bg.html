@@ -475,10 +475,7 @@
     setTimeout(typeLoop, 1500);
 
     // ── Scissor Screen Tear Transition ────────────────────────────
-    const btnSkills = document.getElementById('btn-skills');
-
-    btnSkills.addEventListener('click', async (e) => {
-      e.preventDefault();
+    async function triggerTear(dest) {
       if (isTearRunning) return;
       isTearRunning = true;
       deleting = true;
@@ -613,7 +610,7 @@
         // Navigate when done
         if (elapsed >= TOTAL_DURATION) {
           done = true;
-          window.location.href = 'skills.html';
+          window.location.href = dest;
           return;
         }
 
@@ -621,6 +618,13 @@
       }
 
       requestAnimationFrame(drawFrame);
+    }
+
+    document.getElementById('btn-skills').addEventListener('click', e => {
+      e.preventDefault(); triggerTear('skills.html');
+    });
+    document.getElementById('btn-projects').addEventListener('click', e => {
+      e.preventDefault(); triggerTear('projects.html');
     });
   </script>
 </body>

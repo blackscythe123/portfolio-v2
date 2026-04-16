@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Projects — Simiyon Vinscent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100vw; height: 100vh;
+      background: #000; overflow: hidden;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    #visual   { position: fixed; inset: 0; z-index: 1; display: block; }
+    #selectable {
+      position: fixed; inset: 0; z-index: 2;
+      font-family: 'Courier New', monospace;
+      white-space: pre; line-height: 1;
+      color: transparent; background: transparent;
+      cursor: crosshair;
+      user-select: text; -webkit-user-select: text;
+      overflow: hidden;
+    }
+    #selectable::selection { background: rgba(0,229,255,0.3); color: transparent; }
+
+    /* Curtain */
+    .curtain {
+      position: fixed; top: 0; height: 100vh; width: 50vw;
+      background: #000; z-index: 100;
+      transition: transform 1.5s cubic-bezier(0.8,0,0.2,1);
+    }
+    #curtain-left  { left: 0;  transform-origin: left;  }
+    #curtain-right { right: 0; transform-origin: right; }
+    body.loaded #curtain-left  { transform: scaleX(0); }
+    body.loaded #curtain-right { transform: scaleX(0); }
+
+    /* HUD */
+    #hud {
+      position: fixed; top: 2rem; left: 2rem; z-index: 20; pointer-events: none;
+    }
+    .hud-text {
+      font-size: 0.75rem; color: rgba(0,229,255,0.7);
+      letter-spacing: 0.2em; text-transform: uppercase;
+    }
+
+    #back-btn {
+      position: fixed; top: 2rem; right: 2rem; z-index: 20;
+      padding: 0.5rem 1rem; color: rgba(255,255,255,0.6);
+      border: 1px solid rgba(255,255,255,0.2); text-decoration: none;
+      font-size: 0.75rem; letter-spacing: 0.1em; transition: all 0.2s;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    #back-btn:hover { color: #fff; border-color: #fff; }
+
+    /* Node count badge */
+    #node-count {
+      position: fixed; bottom: 2rem; left: 2rem; z-index: 20;
+      pointer-events: none; font-size: 0.7rem;
+      color: rgba(255,255,255,0.25); letter-spacing: 0.15em;
+    }
+
+    /* Detail modal */
+    #proj-detail {
+      position: fixed; inset: 0; z-index: 50;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.88); backdrop-filter: blur(10px);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.45s ease;
+    }
+    #proj-detail.active { opacity: 1; pointer-events: auto; }
+
+    .proj-card {
+      border: 1px solid rgba(0,229,255,0.35);
+      background: rgba(2,8,22,0.92);
+      padding: 2.8rem; max-width: 640px; width: 90%;
+      box-shadow: 0 0 50px rgba(0,229,255,0.08);
+      transform: translateY(28px);
+      transition: transform 0.45s cubic-bezier(0.2,0.8,0.2,1);
+    }
+    #proj-detail.active .proj-card { transform: translateY(0); }
+
+    .proj-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.4rem, 3vw, 2.2rem);
+      font-weight: 700; text-transform: uppercase;
+      color: #fff; margin-bottom: 0.5rem;
+      text-shadow: 0 0 18px rgba(0,229,255,0.4);
+    }
+    .proj-meta {
+      font-size: 0.75rem; letter-spacing: 0.14em;
+      margin-bottom: 1.6rem; color: #10b981;
+    }
+    .proj-desc {
+      font-size: 0.83rem; color: rgba(255,255,255,0.72);
+      line-height: 1.75; margin-bottom: 2rem;
+    }
+    .proj-layout-info {
+      font-size: 0.65rem; color: rgba(255,255,255,0.2);
+      letter-spacing: 0.12em; margin-bottom: 1.6rem;
+    }
+    .proj-footer {
+      display: flex; gap: 0.9rem; flex-wrap: wrap;
+      align-items: center;
+    }
+    .btn-gh {
+      padding: 0.55rem 1.3rem;
+      border: 1px solid rgba(0,229,255,0.5);
+      color: #00e5ff; text-decoration: none;
+      font-size: 0.78rem; text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-family: 'JetBrains Mono', monospace;
+      transition: all 0.2s;
+    }
+    .btn-gh:hover { background: rgba(0,229,255,0.08); }
+    .btn-close-proj {
+      padding: 0.55rem 1.3rem;
+      border: 1px solid rgba(255,255,255,0.18);
+      color: rgba(255,255,255,0.55);
+      background: transparent; cursor: pointer;
+      font-size: 0.78rem; text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-family: 'JetBrains Mono', monospace;
+      transition: all 0.2s;
+    }
+    .btn-close-proj:hover { border-color: #fff; color: #fff; }
+  </style>
+</head>
+<body>
+
+  <div id="curtain-left"  class="curtain"></div>
+  <div id="curtain-right" class="curtain"></div>
+
+  <canvas id="visual"></canvas>
+  <pre id="selectable" aria-label="ASCII art — selectable"></pre>
+
+  <div id="hud">
+    <div class="hud-text">SECTOR: PROJ_MATRIX</div>
+    <div class="hud-text" id="hud-hint" style="color:rgba(255,255,255,0.35);margin-top:5px;">CLICK NODE TO INSPECT</div>
+  </div>
+
+  <a href="ascii-bg.html" id="back-btn">[ RETURN ]</a>
+  <div id="node-count"></div>
+
+  <div id="proj-detail">
+    <div class="proj-card">
+      <div class="proj-name"         id="modal-name">REPO</div>
+      <div class="proj-meta"         id="modal-meta">LANG // ★ 0</div>
+      <div class="proj-desc"         id="modal-desc">description</div>
+      <div class="proj-layout-info"  id="modal-layout"></div>
+      <div class="proj-footer">
+        <a class="btn-gh" id="modal-link" href="#" target="_blank" rel="noopener">[ VIEW ON GITHUB ]</a>
+        <button class="btn-close-proj" id="btn-close">[ CLOSE ]</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // ── Pretext ──────────────────────────────────────────────────
+    let layoutWithLines, prepareWithSegments, layout, prepare;
+    try {
+      const m = await import('https://esm.sh/@chenglou/pretext@0.1.4');
+      layoutWithLines     = m.layoutWithLines;
+      prepareWithSegments = m.prepareWithSegments;
+      layout              = m.layout;
+      prepare             = m.prepare;
+    } catch (e) { console.warn('Pretext unavailable', e); }
+
+    // ── Config ───────────────────────────────────────────────────
+    const FONT_PX    = 9;
+    const FONT_STR   = `${FONT_PX}px "Courier New", Courier, monospace`;
+    const LABEL_FONT = `700 11px "JetBrains Mono", monospace`;
+    const META_FONT  = `400 9px "JetBrains Mono", monospace`;
+    const LABEL_LINE = 14;
+    const META_LINE  = 12;
+    const CHARS_SRC  = '123456OY@';
+    const CHARS_DIST = '01jfQWERTYUIOASDFGHJKLZXCVBNM@';
+    const DIST_R     = 30;
+    const DIST_DECAY = 0.82;
+
+    // ── Repos ────────────────────────────────────────────────────
+    const REPOS = [
+      { name: 'No-Logs',        lang: 'JavaScript', stars: 12, desc: 'Privacy-first logging utility with zero persistent footprint.',                                                              url: 'https://github.com/blackscythe123/No-Logs'        },
+      { name: 'Retro_Rpg',      lang: 'Java',       stars: 8,  desc: 'Snake, Flappy Bird, and Space Shooter — modernized retro titles with buff stacking and score combos in one Swing app.',    url: 'https://github.com/blackscythe123/Retro_Rpg'      },
+      { name: 'workflow_space', lang: 'TypeScript', stars: 7,  desc: 'Single-page web app for building automation workflows directly from your LLM conversation.',                               url: 'https://github.com/blackscythe123/workflow_space'  },
+      { name: 'Chillz-iptv',   lang: 'Dart',       stars: 3,  desc: 'Client-side IPTV playlist viewer with in-browser HLS playback, VLC fallback, and fast channel navigation.',               url: 'https://github.com/blackscythe123/Chillz-iptv'    },
+      { name: 'FarmLedge',     lang: 'TypeScript', stars: 2,  desc: 'Transparent agricultural supply chain platform — tracking crops from farm to fork with full provenance.',                 url: 'https://github.com/blackscythe123/FarmLedge'      },
+      { name: 'ExpenseIQ',     lang: 'JavaScript', stars: 2,  desc: 'Smart personal expense tracker with ML-driven category intelligence and analytics dashboards.',                           url: 'https://github.com/blackscythe123/ExpenseIQ'      },
+      { name: 'faceguard',     lang: 'Python',     stars: 1,  desc: 'Multi-layer deepfake and AI-generated image detection web app. Protects against impersonation and unauthorized likeness use.', url: 'https://github.com/blackscythe123/faceguard'  },
+      { name: 'ideaquest',     lang: 'JavaScript', stars: 1,  desc: 'WebRTC video conference application with adaptive network optimization for unstable connections.',                         url: 'https://github.com/blackscythe123/ideaquest'      },
+      { name: 'openclaude',    lang: '',           stars: 0,  desc: 'Open-source coding agent CLI for OpenAI, Gemini, DeepSeek, Ollama, and 200+ LLM models via OpenAI-compatible APIs.',      url: 'https://github.com/blackscythe123/openclaude'     },
+      { name: 'flashbook',     lang: 'Dart',       stars: 0,  desc: 'Mobile-first vertical scrolling book reader — Instagram-style knowledge feed for modern readers.',                        url: 'https://github.com/blackscythe123/flashbook'      },
+      { name: 'ShellQuest',    lang: 'C',          stars: 0,  desc: 'Gamified Linux learning OS — level up your shell and systems skills through interactive challenges.',                      url: 'https://github.com/blackscythe123/ShellQuest'     },
+      { name: 'Omerta',        lang: 'Dart',       stars: 0,  desc: 'Full-featured Flutter Mafia party game with local offline LAN multiplayer over UDP/TCP.',                                 url: 'https://github.com/blackscythe123/Omerta'         },
+    ];
+
+    // Language → accent color [r, g, b]
+    const LANG_COLOR = {
+      JavaScript: [255, 212,  50],
+      TypeScript: [ 49, 120, 198],
+      Python:     [ 55, 118, 171],
+      Dart:       [  0, 183, 212],
+      Java:       [176, 114,  25],
+      C:          [ 85,  85, 255],
+      '':         [160, 160, 160],
+    };
+    REPOS.forEach(r => { r.color = LANG_COLOR[r.lang] ?? LANG_COLOR['']; });
+
+    // ── Ring assignment (inner = highest stars) ──────────────────
+    // sorted desc already; split into 3 rings of 4
+    const RING_DEF = [
+      { speedRad: 0.22 },  // inner — fastest
+      { speedRad: 0.14 },  // middle
+      { speedRad: 0.085 }, // outer — slowest
+    ];
+    let rings = []; // populated in setupOrbitRadii
+
+    function setupOrbitRadii() {
+      const S = Math.min(W * 0.45, H * 0.45);
+      rings = RING_DEF.map((def, i) => ({
+        ...def,
+        radius: S * [0.36, 0.60, 0.88][i],
+        repos: [],
+      }));
+      REPOS.forEach((repo, i) => {
+        const ringIdx = Math.min(2, Math.floor(i / 4));
+        const ring = rings[ringIdx];
+        const offset = (ring.repos.length / 4) * Math.PI * 2;
+        ring.repos.push({ ...repo, angle: offset, px: null, py: null, labelWidth: 0, metaWidth: 0 });
+      });
+    }
+
+    // ── Pretext measurements ─────────────────────────────────────
+    await document.fonts.ready;
+
+    // 1. charW — use prepareWithSegments for exact monospace advance
+    let charW = FONT_PX * 0.601;
+    const charH = FONT_PX;
+
+    if (prepareWithSegments && layoutWithLines) {
+      try {
+        const p = prepareWithSegments('X'.repeat(100), FONT_STR);
+        const r = layoutWithLines(p, Infinity, charH);
+        if (r.lines?.length) charW = r.lines[0].width / 100;
+      } catch (e) {}
+    } else {
+      const oc = new OffscreenCanvas(400, 20).getContext('2d');
+      oc.font = FONT_STR;
+      charW    = oc.measureText('X'.repeat(50)).width / 50;
+    }
+
+    // 2. Per-repo label widths — measured once, reused every frame
+    function measureLabels() {
+      for (const ring of rings) {
+        for (const node of ring.repos) {
+          const lbl  = `[ ${node.name} ]`;
+          const meta = node.lang ? `${node.lang}  ★${node.stars}` : `★${node.stars}`;
+          node._label = lbl;
+          node._meta  = meta;
+
+          if (prepareWithSegments && layoutWithLines) {
+            try {
+              const pl = prepareWithSegments(lbl,  LABEL_FONT);
+              const pm = prepareWithSegments(meta, META_FONT);
+              const rl = layoutWithLines(pl, Infinity, LABEL_LINE);
+              const rm = layoutWithLines(pm, Infinity, META_LINE);
+              node.labelWidth = rl.lines?.[0]?.width ?? lbl.length  * 7.2;
+              node.metaWidth  = rm.lines?.[0]?.width ?? meta.length * 5.8;
+              continue;
+            } catch (e) {}
+          }
+          // fallback — OffscreenCanvas measureText
+          const oc2 = new OffscreenCanvas(600, 20).getContext('2d');
+          oc2.font = LABEL_FONT; node.labelWidth = oc2.measureText(lbl).width;
+          oc2.font = META_FONT;  node.metaWidth  = oc2.measureText(meta).width;
+        }
+      }
+    }
+
+    // ── ASCII grid state ─────────────────────────────────────────
+    let W, H, cols, rows, N;
+    let origChars, colR, colG, colB, heat;
+    let cx, cy; // orbit center
+
+    const canvas = document.getElementById('visual');
+    const ctx    = canvas.getContext('2d');
+    const pre    = document.getElementById('selectable');
+    const imgObj = new Image();
+    imgObj.crossOrigin = 'anonymous';
+
+    function setupGrid() {
+      W = window.innerWidth; H = window.innerHeight;
+      cols = Math.floor(W / charW);
+      rows = Math.floor(H / charH);
+      N    = cols * rows;
+      cx   = W / 2;
+      cy   = H * 0.46; // slightly above center — chest of guardian
+
+      canvas.width  = W; canvas.height = H;
+      ctx.font      = FONT_STR;
+      ctx.textBaseline = 'top';
+
+      pre.style.fontSize      = `${FONT_PX}px`;
+      pre.style.lineHeight    = `${charH}px`;
+      pre.style.letterSpacing = '0px';
+
+      origChars = new Uint8Array(N);
+      colR = new Uint8Array(N); colG = new Uint8Array(N); colB = new Uint8Array(N);
+      heat = new Float32Array(N);
+
+      if (!imgObj.complete || imgObj.naturalWidth === 0) return;
+
+      const src = document.createElement('canvas');
+      src.width  = cols; src.height = rows;
+      const sx   = src.getContext('2d');
+      sx.drawImage(imgObj, 0, 0, cols, rows);
+      const { data } = sx.getImageData(0, 0, cols, rows);
+
+      let txt = '';
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const idx = r * cols + c;
+          const p   = idx * 4;
+          colR[idx] = data[p]; colG[idx] = data[p+1]; colB[idx] = data[p+2];
+          const b   = 0.299*data[p] + 0.587*data[p+1] + 0.114*data[p+2];
+          origChars[idx] = Math.floor((b/255) * (CHARS_SRC.length-1));
+          txt += CHARS_SRC[origChars[idx]];
+        }
+        txt += '\n';
+      }
+      pre.textContent = txt;
+
+      // Re-setup orbit radii on resize and re-measure labels
+      setupOrbitRadii();
+      measureLabels();
+      document.getElementById('node-count').textContent =
+        `NODES: ${REPOS.length} // RINGS: 3`;
+    }
+
+    imgObj.onload = () => {
+      setupGrid();
+      setTimeout(() => document.body.classList.add('loaded'), 100);
+    };
+    imgObj.src = 'guardian.webp';
+
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(setupGrid, 200);
+    });
+
+    let mx = -9999, my = -9999;
+    document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+    document.addEventListener('mouseleave', () => { mx = -9999; my = -9999; });
+
+    // ── Modal ─────────────────────────────────────────────────────
+    let activeNode = null;
+    const modal      = document.getElementById('proj-detail');
+    const modalName  = document.getElementById('modal-name');
+    const modalMeta  = document.getElementById('modal-meta');
+    const modalDesc  = document.getElementById('modal-desc');
+    const modalLayout= document.getElementById('modal-layout');
+    const modalLink  = document.getElementById('modal-link');
+    const projCard   = document.querySelector('.proj-card');
+
+    function openModal(node) {
+      activeNode = node;
+      const [r, g, b] = node.color;
+      const col  = `rgb(${r},${g},${b})`;
+      const glow = `rgba(${r},${g},${b},0.45)`;
+
+      modalName.textContent = node.name;
+      modalName.style.color = col;
+      modalName.style.textShadow = `0 0 16px ${glow}`;
+
+      projCard.style.borderColor = `rgba(${r},${g},${b},0.35)`;
+      projCard.style.boxShadow   = `0 0 50px rgba(${r},${g},${b},0.12)`;
+
+      const metaParts = [];
+      if (node.lang) metaParts.push(node.lang.toUpperCase());
+      metaParts.push(`★ ${node.stars}`);
+      modalMeta.textContent = metaParts.join(' // ');
+      modalMeta.style.color = col;
+
+      modalDesc.textContent = node.desc;
+      modalLink.href = node.url;
+
+      // 3. Pretext: measure description layout → show precise line/height metrics
+      if (prepare && layout) {
+        try {
+          const descFont = `13px "JetBrains Mono", monospace`;
+          const p = prepare(node.desc, descFont);
+          // card inner width ≈ 560px (640 - 2*40 padding)
+          const result = layout(p, 560, 22);
+          modalLayout.textContent =
+            `PRETEXT // ${result.lineCount} LINE${result.lineCount !== 1 ? 'S' : ''} · ${result.height}PX`;
+        } catch (e) { modalLayout.textContent = ''; }
+      } else {
+        modalLayout.textContent = '';
+      }
+
+      setTimeout(() => modal.classList.add('active'), 40);
+    }
+
+    document.getElementById('btn-close').addEventListener('click', () => {
+      modal.classList.remove('active');
+      activeNode = null;
+    });
+    modal.addEventListener('click', e => {
+      if (e.target === modal) { modal.classList.remove('active'); activeNode = null; }
+    });
+
+    // ── Click / hover detection (on pre — sits above canvas) ─────
+    pre.addEventListener('click', () => {
+      if (activeNode || !N) return;
+      for (const ring of rings) {
+        for (const node of ring.repos) {
+          if (node.px === null) continue;
+          const dx = mx - node.px;
+          const dy = my - node.py;
+          if (Math.sqrt(dx*dx + dy*dy) < 28) { openModal(node); return; }
+        }
+      }
+    });
+
+    // ── Orbit rendering helpers ───────────────────────────────────
+    const randChar = () => CHARS_DIST[Math.floor(Math.random() * CHARS_DIST.length)];
+
+    function drawOrbitRing(radius, alpha) {
+      ctx.save();
+      ctx.setLineDash([1, 8]);
+      ctx.lineDashOffset = performance.now() * 0.01;
+      ctx.strokeStyle = `rgba(0,229,255,${alpha})`;
+      ctx.lineWidth   = 0.7;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawNode(node, elapsed) {
+      // angle advances with elapsed time
+      const ring  = rings.find(r => r.repos.includes(node));
+      const angle = node.angle + elapsed * ring.speedRad;
+      const nx    = cx + Math.cos(angle) * ring.radius;
+      const ny    = cy + Math.sin(angle) * ring.radius;
+      node.px = nx; node.py = ny;
+
+      const [r, g, b]  = node.color;
+      const col        = `rgb(${r},${g},${b})`;
+      const glow       = `rgba(${r},${g},${b},0.65)`;
+
+      const dx  = mx - nx;
+      const dy  = my - ny;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      const hovered = dist < 28;
+
+      ctx.save();
+
+      // Dot
+      ctx.shadowColor = glow;
+      ctx.shadowBlur  = hovered ? 20 : 7;
+      ctx.fillStyle   = col;
+      ctx.beginPath();
+      ctx.arc(nx, ny, hovered ? 4.5 : 2.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Thin connector line from dot to label
+      ctx.shadowBlur = 0;
+
+      // Label — draw above the dot
+      ctx.font         = LABEL_FONT;
+      ctx.textBaseline = 'middle';
+      const lx = nx - node.labelWidth / 2;
+      const ly = ny - 18;
+
+      if (hovered) {
+        ctx.shadowColor = glow;
+        ctx.shadowBlur  = 14;
+        ctx.fillStyle   = col;
+        ctx.fillText(node._label, lx, ly);
+
+        // Meta line below label
+        ctx.shadowBlur = 0;
+        ctx.font       = META_FONT;
+        ctx.fillStyle  = `rgba(255,255,255,0.5)`;
+        const mx2 = nx - node.metaWidth / 2;
+        ctx.fillText(node._meta, mx2, ly + 16);
+
+        pre.style.cursor = 'pointer';
+      } else {
+        ctx.shadowBlur = 5;
+        ctx.fillStyle  = `rgba(${r},${g},${b},0.72)`;
+        ctx.fillText(node._label, lx, ly);
+      }
+
+      ctx.restore();
+    }
+
+    // ── Frame loop ────────────────────────────────────────────────
+    let startTime = null;
+
+    function frame(now) {
+      if (!N) { requestAnimationFrame(frame); return; }
+      if (!startTime) startTime = now;
+      const elapsed = (now - startTime) / 1000;
+
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, W, H);
+
+      // ── ASCII background ──────────────────────────────────────
+      ctx.font = FONT_STR;
+      ctx.textBaseline = 'top';
+      const mCol = mx / charW;
+      const mRow = my / charH;
+
+      for (let r = 0; r < rows; r++) {
+        const y = r * charH;
+        for (let c = 0; c < cols; c++) {
+          const idx = r * cols + c;
+          let ch    = CHARS_SRC[origChars[idx]];
+          let r_    = colR[idx], g_ = colG[idx], b_ = colB[idx];
+
+          const dx   = (c + 0.5) - mCol;
+          const dy   = (r + 0.5) - mRow;
+          const dist = Math.sqrt(dx*dx + dy*dy) * charW;
+          if (dist < DIST_R) {
+            const s = Math.pow(1 - dist / DIST_R, 2);
+            heat[idx] = Math.min(1, heat[idx] + s);
+          }
+          heat[idx] *= DIST_DECAY;
+          const h = heat[idx];
+          if (h > 0.05 && Math.random() < h) ch = randChar();
+          const boost = h * 180;
+          r_ = Math.min(255, r_ + boost * 0.6) | 0;
+          g_ = Math.min(255, g_ + boost * 0.9) | 0;
+          b_ = Math.min(255, b_ + boost * 0.7) | 0;
+
+          if (r_ > 8 || g_ > 8 || b_ > 8) {
+            ctx.fillStyle = `rgb(${r_},${g_},${b_})`;
+            ctx.fillText(ch, c * charW, y);
+          }
+        }
+      }
+
+      // ── Central glow around guardian ─────────────────────────
+      const pulse = 0.08 + 0.03 * Math.sin(elapsed * 1.2);
+      const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, 90);
+      grd.addColorStop(0,   `rgba(0,229,255,${pulse})`);
+      grd.addColorStop(0.5, `rgba(0,229,255,${pulse * 0.3})`);
+      grd.addColorStop(1,   'rgba(0,229,255,0)');
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, W, H);
+
+      // ── Orbit rings ───────────────────────────────────────────
+      for (let i = 0; i < rings.length; i++) {
+        drawOrbitRing(rings[i].radius, [0.14, 0.09, 0.06][i]);
+      }
+
+      // ── Nodes ─────────────────────────────────────────────────
+      pre.style.cursor = 'crosshair';
+      for (const ring of rings) {
+        for (const node of ring.repos) {
+          drawNode(node, elapsed);
+        }
+      }
+
+      requestAnimationFrame(frame);
+    }
+
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
