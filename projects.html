@@ -401,20 +401,6 @@ const pTex={};
 const aVS=`varying vec3 vN;varying vec3 vWP;void main(){vN=normalize(normalMatrix*normal);vWP=(modelMatrix*vec4(position,1.0)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`;
 const aFS=`uniform vec3 uA;varying vec3 vN;varying vec3 vWP;void main(){vec3 V=normalize(cameraPosition-vWP);float r=pow(1.0-abs(dot(normalize(vN),V)),2.5);gl_FragColor=vec4(uA,r*.78);}`;
 
-function createOrbitLine(a,e,inc,node){
-  const b=a*Math.sqrt(1-e*e),c=a*e,pts=[];
-  for(let i=0;i<=256;i++){
-    const t=(i/256)*Math.PI*2;
-    const v=new THREE.Vector3(a*Math.cos(t)-c,0,b*Math.sin(t));
-    v.applyAxisAngle(new THREE.Vector3(1,0,0),inc);
-    v.applyAxisAngle(new THREE.Vector3(0,1,0),node);
-    pts.push(v);
-  }
-  const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
-    new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:.07,depthWrite:false}));
-  l.frustumCulled=false; return l;
-}
-
 const planetObjs=[], labelEls=[];
 REPOS.forEach((repo,i)=>{
   const [cr,cg,cb]=repo.col;
@@ -440,8 +426,6 @@ REPOS.forEach((repo,i)=>{
       transparent:true,side:THREE.FrontSide,depthWrite:false})
   );
   atmo.frustumCulled=false; scene.add(atmo);
-
-  scene.add(createOrbitLine(repo.orbit.a,repo.orbit.e,repo.orbit.inc,repo.orbit.node));
 
   // ── NO TRAILS (removed per request) ──
 
