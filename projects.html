@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Cosmos · Blackscythe123</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#000;color:#ccc;font-family:'JetBrains Mono',monospace;overflow:hidden;width:100vw;height:100vh;user-select:none}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+#star-canvas{z-index:0}
+#gl-canvas{z-index:1;background:transparent;cursor:grab}
+#gl-canvas:active{cursor:grabbing}
+
+#cl,#cr{position:fixed;top:0;z-index:100;width:50%;height:100%;background:#000;transition:transform 1.4s cubic-bezier(.77,0,.18,1)}
+#cl{left:0;transform-origin:left center}
+#cr{right:0;transform-origin:right center}
+body.loaded #cl{transform:scaleX(0)}
+body.loaded #cr{transform:scaleX(0)}
+
+#warp{position:fixed;inset:0;z-index:99;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;transition:opacity .9s ease}
+#warp.hide{opacity:0;pointer-events:none}
+#warp-logo{font-size:10px;letter-spacing:8px;color:rgba(140,80,255,.5);text-transform:uppercase}
+#warp-status{font-size:14px;letter-spacing:4px;color:rgba(200,150,255,.9);min-height:1.2em;text-align:center}
+#warp-bar{width:260px;height:1px;background:rgba(140,80,255,.15);position:relative;overflow:hidden}
+#warp-fill{position:absolute;top:0;left:0;height:100%;background:linear-gradient(90deg,rgba(140,80,255,.6),rgba(220,180,255,.95));width:0%;transition:width 2.2s cubic-bezier(.2,.8,.3,1)}
+#warp-sub{font-size:9px;letter-spacing:3px;color:rgba(140,80,255,.35);text-transform:uppercase}
+
+#nav{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:10;padding:0 0 0 22px;display:flex;flex-direction:column;gap:20px}
+.nav-it{font-size:10px;letter-spacing:2.5px;color:rgba(200,185,230,.3);cursor:pointer;transition:color .2s;text-decoration:none;display:flex;align-items:center;gap:8px}
+.nav-it:hover{color:rgba(200,185,230,.65)}
+.nav-it.on{color:rgba(200,185,230,.9)}
+.nav-it .b{font-size:7px}
+
+#sector{position:fixed;top:18px;left:22px;z-index:10;font-size:9px;letter-spacing:3px;color:rgba(200,185,230,.25)}
+#systag{position:fixed;top:18px;right:22px;z-index:10;font-size:9px;letter-spacing:3px;color:rgba(140,80,255,.35)}
+
+#hud{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:10;display:flex;flex-direction:column;align-items:center;gap:12px}
+#hud-hint{font-size:9px;letter-spacing:3px;color:rgba(140,80,255,.55);text-transform:uppercase;min-height:1em;text-align:center}
+#tour-ctrl{display:flex;gap:14px;align-items:center}
+.tc{background:rgba(140,80,255,.07);border:1px solid rgba(140,80,255,.18);color:rgba(200,150,255,.75);font-family:inherit;font-size:9px;letter-spacing:2px;padding:7px 18px;cursor:pointer;transition:all .2s;text-transform:uppercase}
+.tc:hover{background:rgba(140,80,255,.18);border-color:rgba(140,80,255,.45);color:#fff}
+.tc.on{background:rgba(140,80,255,.22);border-color:rgba(140,80,255,.55);color:#fff}
+#pdots{display:flex;gap:9px;align-items:center}
+.pdot{width:7px;height:7px;border-radius:50%;background:rgba(140,80,255,.2);cursor:pointer;transition:all .3s}
+.pdot.on{background:rgba(220,180,255,.9);box-shadow:0 0 10px rgba(200,150,255,.7);transform:scale(1.5)}
+
+#dp{position:fixed;right:0;top:0;height:100%;width:min(340px,34vw);z-index:10;
+  background:rgba(3,0,10,.9);border-left:1px solid rgba(140,80,255,.15);
+  backdrop-filter:blur(16px);padding:44px 26px 26px;
+  transform:translateX(100%);transition:transform .5s cubic-bezier(.22,.68,0,1.2);
+  display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+#dp.open{transform:translateX(0)}
+.dp-type{font-size:9px;letter-spacing:3px;color:rgba(140,80,255,.55);text-transform:uppercase}
+.dp-name{font-size:21px;font-weight:700;letter-spacing:1px}
+.dp-div{height:1px;background:rgba(140,80,255,.15);flex-shrink:0}
+.dp-stars{font-size:12px;letter-spacing:2px}
+.dp-row{display:flex;justify-content:space-between;font-size:10px;padding:2px 0}
+.dp-lbl{color:rgba(140,80,255,.55);font-size:9px;letter-spacing:2px}
+.dp-val{color:rgba(210,195,240,.9)}
+.dp-bonus-hdr{font-size:9px;letter-spacing:2px;color:rgba(255,200,80,.65);text-transform:uppercase}
+.dp-bonus{font-size:9px;color:rgba(200,185,230,.45);line-height:1.7}
+.dp-desc{font-size:10px;line-height:1.75;color:rgba(200,185,230,.5)}
+.dp-link{display:block;text-align:center;padding:10px;border:1px solid rgba(140,80,255,.25);color:rgba(200,150,255,.75);text-decoration:none;font-size:9px;letter-spacing:3px;text-transform:uppercase;transition:all .2s;margin-top:auto;flex-shrink:0}
+.dp-link:hover{background:rgba(140,80,255,.14);border-color:rgba(140,80,255,.55)}
+.dp-x{position:absolute;top:14px;right:14px;background:none;border:none;color:rgba(140,80,255,.4);font-family:inherit;font-size:16px;cursor:pointer;transition:color .2s;line-height:1}
+.dp-x:hover{color:rgba(200,150,255,.9)}
+
+.plbl{position:fixed;z-index:8;pointer-events:none;font-size:9px;letter-spacing:2.5px;text-transform:uppercase;transform:translate(-50%,-100%);transition:opacity .4s;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<canvas id="star-canvas"></canvas>
+<canvas id="gl-canvas"></canvas>
+<div id="cl"></div><div id="cr"></div>
+
+<div id="warp">
+  <div id="warp-logo">Blackscythe123 · Repository Cosmos</div>
+  <div id="warp-status">STANDBY</div>
+  <div id="warp-bar"><div id="warp-fill"></div></div>
+  <div id="warp-sub">6 planetary systems detected</div>
+</div>
+
+<nav id="nav">
+  <a href="ascii-bg.html" class="nav-it"><span class="b">◇</span>Home</a>
+  <a href="skills.html" class="nav-it"><span class="b">◇</span>Skills</a>
+  <div class="nav-it on"><span class="b">◆</span>Cosmos</div>
+  <a href="https://github.com/blackscythe123" target="_blank" class="nav-it"><span class="b">◇</span>GitHub</a>
+</nav>
+
+<div id="sector">SYS.COSMOS · EVENT HORIZON</div>
+<div id="systag">BLACKSCYTHE123</div>
+
+<aside id="dp">
+  <button class="dp-x" id="dp-close">✕</button>
+  <div class="dp-type" id="dp-type"></div>
+  <div class="dp-name" id="dp-name"></div>
+  <div class="dp-div"></div>
+  <div class="dp-stars" id="dp-stars"></div>
+  <div id="dp-stats"></div>
+  <div class="dp-div"></div>
+  <div class="dp-bonus-hdr">Orbital Data</div>
+  <div class="dp-bonus" id="dp-bonus"></div>
+  <div class="dp-div"></div>
+  <div class="dp-desc" id="dp-desc"></div>
+  <a class="dp-link" id="dp-link" href="#" target="_blank" rel="noopener">Explore Repository →</a>
+</aside>
+
+<div id="hud">
+  <div id="hud-hint">INITIALIZING COSMOS...</div>
+  <div id="tour-ctrl">
+    <button class="tc" id="btn-prev">◀ PREV</button>
+    <button class="tc on" id="btn-play">⏸ PAUSE</button>
+    <button class="tc" id="btn-next">NEXT ▶</button>
+  </div>
+  <div id="pdots"></div>
+</div>
+
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.158.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.158.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// ── Data ─────────────────────────────────────────────────────────────────────
+const REPOS = [
+  { name:'ada',         lang:'HTML',       stars:0, planet:'mercury',
+    desc:'Interactive web experience in pure HTML — no frameworks, no build step. A study in raw browser APIs and creative canvas rendering.',
+    url:'https://github.com/blackscythe123/ada',
+    col:[200,190,185], atmo:[.9,.8,.7],
+    orbit:{a:52,e:0.38,inc:0.15,node:0.0,baseSpeed:0.0072,precRate:0.006,phase:0} },
+  { name:'dbms',        lang:'Shell',      stars:0, planet:'earth',
+    desc:'Database management system built from scratch with shell scripting — storage, indexing and query execution without a runtime.',
+    url:'https://github.com/blackscythe123/dbms',
+    col:[70,160,255],  atmo:[.18,.6,1],
+    orbit:{a:70,e:0.22,inc:-0.25,node:1.05,baseSpeed:0.0055,precRate:0.004,phase:1.26} },
+  { name:'ExpenseIQ',   lang:'JavaScript', stars:2, planet:'jupiter',
+    desc:'Smart personal expense tracker with ML-driven category intelligence, visual analytics dashboards and real-time budgeting.',
+    url:'https://github.com/blackscythe123/ExpenseIQ',
+    col:[220,180,120], atmo:[.9,.7,.4],
+    orbit:{a:98,e:0.18,inc:0.42,node:2.20,baseSpeed:0.0038,precRate:0.003,phase:2.51} },
+  { name:'openclaude',  lang:'CLI',        stars:0, planet:'mars',
+    desc:'Open-source coding agent CLI supporting OpenAI, Gemini, DeepSeek, Ollama and 200+ models via compatible APIs.',
+    url:'https://github.com/blackscythe123/openclaude',
+    col:[210,80,50],   atmo:[.8,.3,.2],
+    orbit:{a:62,e:0.45,inc:-0.35,node:3.14,baseSpeed:0.0064,precRate:0.007,phase:3.77} },
+  { name:'FarmLedge',   lang:'TypeScript', stars:2, planet:'saturn',
+    desc:'Transparent agricultural supply chain platform tracking crops from farm to fork with full on-chain provenance records.',
+    url:'https://github.com/blackscythe123/FarmLedge',
+    col:[200,175,130], atmo:[.8,.7,.5],
+    orbit:{a:88,e:0.28,inc:0.30,node:4.19,baseSpeed:0.0042,precRate:0.004,phase:5.03} },
+  { name:'portfolio-v2',lang:'Canvas',     stars:3, planet:'neptune',
+    desc:'This very cosmos — ASCII art universe, WebGL black hole, gravitational lensing, 6-planet tour. Pure browser APIs, zero frameworks.',
+    url:'https://github.com/blackscythe123/portfolio-v2',
+    col:[80,130,255],  atmo:[.3,.5,1],
+    orbit:{a:118,e:0.12,inc:0.52,node:5.24,baseSpeed:0.0028,precRate:0.002,phase:1.88} },
+];
+function seeded(s,o,r){let h=o;for(const c of s)h=(h*31+c.charCodeAt(0))&0xffff;return h%r;}
+function rarity(s){return s>=3?'★★★★★':s>=2?'★★★★☆':s>=1?'★★★☆☆':'★★☆☆☆';}
+
+// ── Canvases ─────────────────────────────────────────────────────────────────
+const starC=document.getElementById('star-canvas'), starX=starC.getContext('2d');
+const glC=document.getElementById('gl-canvas');
+let W,H;
+
+// ── ASCII starfield ───────────────────────────────────────────────────────────
+const SCHARS=['·','.','+','*','✦','✧','◦','○','•'];
+const STARS=Array.from({length:480},(_,i)=>({
+  nx:Math.random(),ny:Math.random(),ch:SCHARS[i%SCHARS.length],
+  sz:7+Math.floor(Math.random()*6),base:.12+Math.random()*.38,
+  tw:Math.random()*Math.PI*2,ts:.4+Math.random()*1.6,
+  col:Math.random()<.15?'rgba(200,160,255,':Math.random()<.3?'rgba(180,220,255,':'rgba(205,195,235,',
+}));
+const NEBULA_WORDS=['COSMOS','QUANTUM','VOID','SINGULARITY','ENTROPY','GENESIS','AXIOM','CIPHER','NEXUS'];
+const NEBULAS=Array.from({length:18},(_,i)=>({
+  nx:.05+Math.random()*.9,ny:.05+Math.random()*.9,
+  word:NEBULA_WORDS[i%NEBULA_WORDS.length],alpha:.025+Math.random()*.04,
+}));
+let warpMode=true, warpProgress=0;
+
+function drawStars(t,azimuth){
+  starX.clearRect(0,0,W,H);
+  const px=azimuth*0.032;
+  if(warpMode){
+    const wl=warpProgress;
+    for(const s of STARS){
+      const sx=((s.nx+px*.06)%1)*W, sy=s.ny*H;
+      const len=wl*W*.35*s.base;
+      starX.strokeStyle=`rgba(200,180,255,${(s.base*wl).toFixed(3)})`;
+      starX.lineWidth=.8; starX.beginPath(); starX.moveTo(sx,sy);
+      starX.lineTo(sx-len*(sx/W-.5)*2,sy-len*(sy/H-.5)*1.5); starX.stroke();
+    }
+    return;
+  }
+  starX.font='8px "Courier New",monospace';
+  for(const nb of NEBULAS){
+    starX.fillStyle=`rgba(140,80,255,${nb.alpha.toFixed(3)})`;
+    starX.fillText(nb.word,((nb.nx+px*.01)%1)*W,nb.ny*H);
+  }
+  for(const s of STARS){
+    const sx=((s.nx+px*.05)%1)*W, sy=s.ny*H;
+    const a=s.base+Math.sin(t*s.ts+s.tw)*.1;
+    starX.font=`${s.sz}px "Courier New",monospace`;
+    starX.fillStyle=`${s.col}${a.toFixed(3)})`;
+    starX.fillText(s.ch,sx,sy);
+  }
+}
+
+// ── THREE setup ───────────────────────────────────────────────────────────────
+const renderer=new THREE.WebGLRenderer({canvas:glC,alpha:true,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setClearColor(0x000000,0);
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=0.75;
+
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(65,1,.5,2000);
+camera.position.set(0,0,250);
+
+scene.add(new THREE.AmbientLight(0x111133,.30));
+const diskLight=new THREE.PointLight(0xffaa44,3.5,500);
+scene.add(diskLight);
+
+// ── BH Raytracer shader ───────────────────────────────────────────────────────
+const BH_VERT=`void main(){gl_Position=vec4(position,1.0);}`;
+const BH_FRAG=`
+#define STEP 0.05
+#define NSTEPS 600
+#define PI 3.141592653589793238462643383279
+#define DEG_TO_RAD (PI/180.0)
+#define ROT_Z(a) mat3(cos(a),-sin(a),0, sin(a),cos(a),0, 0,0,1)
+uniform float time; uniform vec2 resolution;
+uniform vec3 cam_pos; uniform vec3 cam_dir; uniform vec3 cam_up; uniform float fov; uniform vec3 cam_vel;
+uniform bool accretion_disk; uniform bool use_disk_texture;
+const float DISK_IN=2.0; const float DISK_WIDTH=4.0;
+uniform bool doppler_shift; uniform bool lorentz_transform; uniform bool beaming;
+uniform sampler2D bg_texture; uniform sampler2D star_texture; uniform sampler2D disk_texture;
+const float MIN_TEMPERATURE=1000.0; const float TEMPERATURE_RANGE=39000.0;
+vec2 square_frame(vec2 ss){vec2 p=2.0*(gl_FragCoord.xy/ss.xy)-1.0;return p;}
+vec2 to_spherical(vec3 c){vec2 uv=vec2(atan(c.z,c.x),asin(c.y));uv*=vec2(1.0/(2.0*PI),1.0/PI);uv+=0.5;return uv;}
+vec3 lorentz_transform_velocity(vec3 u,vec3 v){float speed=length(v);if(speed>0.0){float gamma=1.0/sqrt(1.0-dot(v,v));float denom=1.0-dot(v,u);vec3 new_u=(u/gamma-v+(gamma/(gamma+1.0))*dot(u,v)*v)/denom;return new_u;}return u;}
+vec3 temp_to_color(float tk){vec3 c;tk=clamp(tk,1000.0,40000.0)/100.0;if(tk<=66.0){c.r=255.0;c.g=tk;c.g=99.4708025861*log(c.g)-161.1195681661;c.g=clamp(c.g,0.0,255.0);}else{c.r=clamp(329.698727446*pow(tk-60.0,-0.1332047592),0.0,255.0);c.g=clamp(288.1221695283*pow(tk-60.0,-0.0755148492),0.0,255.0);}c.b=(tk>=66.0)?255.0:(tk<=19.0)?0.0:clamp(138.5177312231*log(tk-10.0)-305.0447927307,0.0,255.0);return c/255.0;}
+void main(){
+  float uvfov=tan(fov/2.0*DEG_TO_RAD);
+  vec2 uv=square_frame(resolution); uv*=vec2(resolution.x/resolution.y,1.0);
+  vec3 fwd=normalize(cam_dir); vec3 up=normalize(cam_up);
+  vec3 nright=normalize(cross(fwd,up)); up=cross(nright,fwd);
+  vec3 pixel_pos=cam_pos+fwd+nright*uv.x*uvfov+up*uv.y*uvfov;
+  vec3 ray_dir=normalize(pixel_pos-cam_pos);
+  if(lorentz_transform) ray_dir=lorentz_transform_velocity(ray_dir,cam_vel);
+  vec4 color=vec4(0,0,0,1); vec3 point=cam_pos; vec3 velocity=ray_dir;
+  vec3 cv=cross(point,velocity); float h2=dot(cv,cv);
+  float rg=1.0/sqrt(1.0-dot(cam_vel,cam_vel));
+  float rdf=rg*(1.0+dot(ray_dir,-cam_vel));
+  float ray_intensity=1.0; if(beaming) ray_intensity/=pow(rdf,3.0);
+  vec3 oldpoint; float dist=length(point);
+  for(int i=0;i<NSTEPS;i++){
+    oldpoint=point; point+=velocity*STEP;
+    velocity+=-1.5*h2*point/pow(dot(point,point),2.5)*STEP;
+    dist=length(point);
+    if(dist<1.0&&length(oldpoint)>1.0){color+=vec4(0,0,0,1);break;}
+    if(accretion_disk&&oldpoint.y*point.y<0.0){
+      float lam=-oldpoint.y/velocity.y; vec3 isect=oldpoint+lam*velocity;
+      float r=length(isect);
+      if(DISK_IN<=r&&r<=DISK_IN+DISK_WIDTH){
+        float phi=atan(isect.x,isect.z);
+        vec3 dvel=vec3(-isect.x,0.0,isect.z)/sqrt(2.0*(r-1.0))/(r*r);
+        phi-=time; phi=mod(phi,PI*2.0);
+        float dg=1.0/sqrt(1.0-dot(dvel,dvel));
+        float ddf=dg*(1.0+dot(ray_dir/dist,dvel));
+        if(use_disk_texture){
+          vec2 tc=vec2(mod(phi,2.0*PI)/(2.0*PI),1.0-(r-DISK_IN)/DISK_WIDTH);
+          vec4 dc=texture2D(disk_texture,tc)/(rdf*ddf);
+          float da=clamp(dot(dc,dc)/4.5,0.0,1.0); if(beaming) da/=pow(ddf,3.0);
+          color+=vec4(dc)*da;
+        }else{
+          float dt=10000.0*pow(r/DISK_IN,-0.75); if(doppler_shift) dt/=rdf*ddf;
+          vec3 dc=temp_to_color(dt); float da=clamp(dot(dc,dc)/3.0,0.0,1.0);
+          if(beaming) da/=pow(ddf,3.0); color+=vec4(dc,1.0)*da;
+        }
+      }
+    }
+  }
+  if(dist>1.0){
+    ray_dir=normalize(point-oldpoint);
+    vec2 tc=to_spherical(ray_dir*ROT_Z(45.0*DEG_TO_RAD));
+    vec4 sc=texture2D(star_texture,tc);
+    if(sc.g>0.0){
+      float st=MIN_TEMPERATURE+TEMPERATURE_RANGE*sc.r;
+      float sv=sc.b-0.5; float sdf=sqrt((1.0+sv)/(1.0-sv));
+      if(doppler_shift) st/=rdf*sdf;
+      color+=vec4(temp_to_color(st),1.0)*sc.g;
+    }
+    color+=texture2D(bg_texture,tc)*0.25;
+  }
+  gl_FragColor=color*ray_intensity;
+}`;
+
+const bhUniforms={
+  time:{value:0},resolution:{value:new THREE.Vector2()},
+  cam_pos:{value:new THREE.Vector3()},cam_dir:{value:new THREE.Vector3()},
+  cam_up:{value:new THREE.Vector3(0,1,0)},cam_vel:{value:new THREE.Vector3()},
+  fov:{value:65.0},accretion_disk:{value:true},use_disk_texture:{value:true},
+  doppler_shift:{value:true},lorentz_transform:{value:true},beaming:{value:true},
+  bg_texture:{value:null},star_texture:{value:null},disk_texture:{value:null},
+};
+const bhMesh=new THREE.Mesh(
+  new THREE.PlaneGeometry(2,2),
+  new THREE.ShaderMaterial({uniforms:bhUniforms,vertexShader:BH_VERT,fragmentShader:BH_FRAG,
+    depthTest:false,depthWrite:false,glslVersion:THREE.GLSL1}));
+bhMesh.frustumCulled=false; bhMesh.renderOrder=-1000; scene.add(bhMesh);
+
+const txLoader=new THREE.TextureLoader();
+txLoader.load('threejs-blackhole/assets/milkyway.jpg',t=>{bhUniforms.bg_texture.value=t;});
+txLoader.load('threejs-blackhole/assets/star_noise.png',t=>{bhUniforms.star_texture.value=t;});
+txLoader.load('threejs-blackhole/assets/accretion_disk.png',t=>{bhUniforms.disk_texture.value=t;});
+
+// ── BH DEPTH OCCLUDER ─────────────────────────────────────────────────────────
+// FIX: The BH shader is a 2D fullscreen quad — Three.js doesn't know about it,
+// so planets rendered behind the black disc are still visible. We fix this by
+// placing an invisible sphere at the BH origin that ONLY writes to the depth
+// buffer (colorWrite:false). Any planet fragment further from camera than this
+// sphere's surface will fail the depth test and get correctly hidden.
+// Radius 44 = just inside the accretion disk inner edge (Sch r=2 = 50 world units),
+// big enough to represent the visual black shadow (~2.6×Rs ≈ 65 world from afar
+// but we stay conservative so close-approach planets still peek through).
+const bhOccluder=new THREE.Mesh(
+  new THREE.SphereGeometry(44,64,32),
+  new THREE.MeshBasicMaterial({colorWrite:false,depthWrite:true,side:THREE.FrontSide})
+);
+// Render AFTER the BH shader quad (-1000) but BEFORE planets (0)
+// so depth is written first, then planet fragments are tested against it.
+bhOccluder.renderOrder=-500;
+scene.add(bhOccluder);
+
+// ── BH_SCALE: 1 Schwarzschild unit = BH_SCALE world units ────────────────────
+const BH_SCALE=25;
+
+// ── Idle camera state (full spherical) ───────────────────────────────────────
+// Previously only theta was controllable (horizontal drag only).
+// Now we track azimuth + elevation independently for full 360° orbit.
+const idleCam={
+  azimuth:0,            // horizontal angle (radians)
+  elevation:-0.087,     // vertical angle (≈ -5°, slight top-down tilt)
+  radius:250,           // fixed orbital distance from BH
+  autoSpeed:0.0008,     // auto-rotate speed when not dragging
+};
+const EL_MIN=-Math.PI/2.2;  // ~-82° (almost straight down)
+const EL_MAX= Math.PI/2.2;  // ~+82° (almost straight up)
+
+function idleCamVel(){
+  // Approximate horizontal velocity for Doppler in shader (tangential)
+  const bhSchR = idleCam.radius / BH_SCALE;
+  const angV = idleCam.autoSpeed;
+  const cosE = Math.cos(idleCam.elevation);
+  // Velocity magnitude in Schwarzschild units
+  const vMag = angV * bhSchR * cosE;
+  const az = idleCam.azimuth;
+  return new THREE.Vector3(Math.cos(az)*vMag, 0, -Math.sin(az)*vMag);
+}
+
+function syncIdleCamera(){
+  const {azimuth,elevation,radius}=idleCam;
+  const cosE=Math.cos(elevation);
+  camera.position.set(
+    radius*cosE*Math.sin(azimuth),
+    radius*Math.sin(elevation),
+    radius*cosE*Math.cos(azimuth)
+  );
+  camera.lookAt(0,0,0);
+}
+
+// ── CORE: always sync BH shader from actual camera ───────────────────────────
+const _camDir=new THREE.Vector3();
+const _camUp=new THREE.Vector3();
+function syncBHFromCamera(){
+  const schPos=camera.position.clone().divideScalar(BH_SCALE);
+  const rSch=schPos.length();
+  if(rSch<1.8) schPos.multiplyScalar(1.8/rSch); // clamp inside event horizon
+  bhUniforms.cam_pos.value.copy(schPos);
+  camera.getWorldDirection(_camDir);
+  bhUniforms.cam_dir.value.copy(_camDir);
+  camera.updateMatrixWorld(false);
+  _camUp.setFromMatrixColumn(camera.matrixWorld,1);
+  bhUniforms.cam_up.value.copy(_camUp);
+}
+
+// ── Planets ───────────────────────────────────────────────────────────────────
+const pTxLoader=new THREE.TextureLoader();
+const pTex={};
+['mercury','earth','mars','jupiter','saturn','neptune'].forEach(n=>{
+  pTex[n]=pTxLoader.load(`planets/${n}.jpg`);
+});
+
+const aVS=`varying vec3 vN;varying vec3 vWP;void main(){vN=normalize(normalMatrix*normal);vWP=(modelMatrix*vec4(position,1.0)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`;
+const aFS=`uniform vec3 uA;varying vec3 vN;varying vec3 vWP;void main(){vec3 V=normalize(cameraPosition-vWP);float r=pow(1.0-abs(dot(normalize(vN),V)),2.5);gl_FragColor=vec4(uA,r*.78);}`;
+
+function createOrbitLine(a,e,inc,node){
+  const b=a*Math.sqrt(1-e*e),c=a*e,pts=[];
+  for(let i=0;i<=256;i++){
+    const t=(i/256)*Math.PI*2;
+    const v=new THREE.Vector3(a*Math.cos(t)-c,0,b*Math.sin(t));
+    v.applyAxisAngle(new THREE.Vector3(1,0,0),inc);
+    v.applyAxisAngle(new THREE.Vector3(0,1,0),node);
+    pts.push(v);
+  }
+  const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:.07,depthWrite:false}));
+  l.frustumCulled=false; return l;
+}
+
+const planetObjs=[], labelEls=[];
+REPOS.forEach((repo,i)=>{
+  const [cr,cg,cb]=repo.col;
+  const radius=5.8+seeded(repo.name,3,20)*.14;
+  const mesh=new THREE.Mesh(
+    new THREE.SphereGeometry(radius,64,32),
+    new THREE.MeshPhongMaterial({map:pTex[repo.planet],shininess:12,specular:new THREE.Color(.04,.04,.06)})
+  );
+  mesh.frustumCulled=false; scene.add(mesh);
+
+  if(repo.planet==='saturn'){
+    const ring=new THREE.Mesh(
+      new THREE.RingGeometry(radius*1.45,radius*2.5,80),
+      new THREE.MeshBasicMaterial({color:0xc8b09a,transparent:true,opacity:.72,
+        side:THREE.DoubleSide,depthWrite:false}));
+    ring.rotation.x=Math.PI/2.5; mesh.add(ring);
+  }
+
+  const atmo=new THREE.Mesh(
+    new THREE.SphereGeometry(radius*1.22,32,32),
+    new THREE.ShaderMaterial({vertexShader:aVS,fragmentShader:aFS,
+      uniforms:{uA:{value:new THREE.Color(repo.atmo[0],repo.atmo[1],repo.atmo[2])}},
+      transparent:true,side:THREE.FrontSide,depthWrite:false})
+  );
+  atmo.frustumCulled=false; scene.add(atmo);
+
+  scene.add(createOrbitLine(repo.orbit.a,repo.orbit.e,repo.orbit.inc,repo.orbit.node));
+
+  // ── NO TRAILS (removed per request) ──
+
+  const lbl=document.createElement('div');
+  lbl.className='plbl'; lbl.textContent=repo.name.toUpperCase();
+  lbl.style.color=`rgba(${cr},${cg},${cb},.75)`;
+  document.body.appendChild(lbl); labelEls.push(lbl);
+
+  planetObjs.push({mesh,atmo,repo,i});
+});
+
+// Nav dots
+const pdotsEl=document.getElementById('pdots');
+REPOS.forEach((r,i)=>{
+  const d=document.createElement('div'); d.className='pdot';
+  d.style.background=`rgba(${r.col[0]},${r.col[1]},${r.col[2]},.22)`;
+  d.addEventListener('click',()=>goTo(i));
+  pdotsEl.appendChild(d);
+});
+function updDots(){
+  document.querySelectorAll('.pdot').forEach((d,i)=>{
+    const r=REPOS[i]; d.classList.toggle('on',i===curPlanet);
+    d.style.background=i===curPlanet
+      ?`rgba(${r.col[0]},${r.col[1]},${r.col[2]},.9)`
+      :`rgba(${r.col[0]},${r.col[1]},${r.col[2]},.22)`;
+  });
+}
+
+// ── Post-processing ───────────────────────────────────────────────────────────
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(1,1),0.55,.3,.88));
+
+// ── MOUSE DRAG: full spherical orbit (azimuth + elevation) ───────────────────
+// Previously only theta (horizontal) was controllable.
+// Now left/right drag → azimuth, up/down drag → elevation.
+let isDragging=false, dragMoved=false, lastMX=0, lastMY=0;
+
+function onDragStart(x,y){
+  if(tourState!==ST.IDLE) return;
+  isDragging=true; dragMoved=false; lastMX=x; lastMY=y;
+}
+function onDragMove(x,y){
+  if(!isDragging) return;
+  const dx=x-lastMX, dy=y-lastMY;
+  if(Math.abs(dx)>2||Math.abs(dy)>2) dragMoved=true;
+  idleCam.azimuth  -= dx*0.005;
+  idleCam.elevation = Math.max(EL_MIN, Math.min(EL_MAX, idleCam.elevation - dy*0.004));
+  idleCam.autoSpeed=0; // pause auto-rotate while dragging
+  lastMX=x; lastMY=y;
+}
+function onDragEnd(){
+  if(isDragging){
+    isDragging=false;
+    // Resume gentle auto-rotate after drag
+    setTimeout(()=>{ if(tourState===ST.IDLE) idleCam.autoSpeed=0.0008; },1200);
+  }
+}
+
+glC.addEventListener('mousedown',e=>onDragStart(e.clientX,e.clientY));
+window.addEventListener('mousemove',e=>onDragMove(e.clientX,e.clientY));
+window.addEventListener('mouseup',onDragEnd);
+glC.addEventListener('touchstart',e=>{onDragStart(e.touches[0].clientX,e.touches[0].clientY);},{passive:true});
+window.addEventListener('touchmove',e=>{onDragMove(e.touches[0].clientX,e.touches[0].clientY);},{passive:true});
+window.addEventListener('touchend',onDragEnd);
+
+// ── Tour FSM ──────────────────────────────────────────────────────────────────
+const ST={IDLE:0,TRAVEL:1,INSPECT:2,PAUSED:3};
+let tourState=ST.IDLE, curPlanet=-1, playing=true;
+let tFrom=new THREE.Vector3(), tStart=0;
+const TRAVEL_MS=2600, INSPECT_MS=5500;
+let inspStart=0;
+
+function getPCamPos(idx){
+  const p=planetObjs[idx].mesh.position.clone();
+  return p.clone().add(p.clone().normalize().multiplyScalar(36)).add(new THREE.Vector3(0,16,0));
+}
+function goTo(idx){
+  if(idx<0)idx=REPOS.length-1;
+  if(idx>=REPOS.length)idx=0;
+  closeDP(); curPlanet=idx; tourState=ST.TRAVEL;
+  tStart=performance.now(); tFrom.copy(camera.position); updDots();
+}
+function openDP(idx){
+  const r=REPOS[idx];const[cr,cg,cb]=r.col;
+  document.getElementById('dp-type').textContent=`${r.lang} · Planet ${idx+1} of ${REPOS.length}`;
+  const nm=document.getElementById('dp-name');
+  nm.textContent=r.name; nm.style.color=`rgb(${cr},${cg},${cb})`;
+  nm.style.textShadow=`0 0 22px rgba(${cr},${cg},${cb},.4)`;
+  document.getElementById('dp-stars').textContent=rarity(r.stars);
+  const inc=(r.orbit.inc*180/Math.PI).toFixed(1), ecc=r.orbit.e.toFixed(2);
+  document.getElementById('dp-stats').innerHTML=`
+    <div class="dp-row"><span class="dp-lbl">Semi-major Axis</span><span class="dp-val">${r.orbit.a} AU</span></div>
+    <div class="dp-row"><span class="dp-lbl">Eccentricity</span><span class="dp-val">${ecc}</span></div>
+    <div class="dp-row"><span class="dp-lbl">Inclination</span><span class="dp-val">${inc}°</span></div>
+    <div class="dp-row"><span class="dp-lbl">Language</span><span class="dp-val">${r.lang}</span></div>
+    <div class="dp-row"><span class="dp-lbl">Stars</span><span class="dp-val">⭐ ${r.stars}</span></div>`;
+  document.getElementById('dp-bonus').textContent=
+    `Elliptical orbit e=${ecc}, inclined ${inc}° — precesses ${r.orbit.precRate.toFixed(3)} rad/rev (GR)`;
+  document.getElementById('dp-desc').textContent=r.desc;
+  document.getElementById('dp-link').href=r.url;
+  document.getElementById('dp').classList.add('open');
+}
+function closeDP(){document.getElementById('dp').classList.remove('open');}
+
+document.getElementById('btn-play').addEventListener('click',()=>{
+  playing=!playing;
+  const b=document.getElementById('btn-play');
+  if(playing){b.textContent='⏸ PAUSE';b.classList.add('on');if(tourState===ST.PAUSED){tourState=ST.INSPECT;inspStart=performance.now();}}
+  else{b.textContent='▶ PLAY';b.classList.remove('on');if(tourState===ST.INSPECT)tourState=ST.PAUSED;}
+});
+document.getElementById('btn-prev').addEventListener('click',()=>goTo(curPlanet-1));
+document.getElementById('btn-next').addEventListener('click',()=>goTo(curPlanet+1));
+document.getElementById('dp-close').addEventListener('click',()=>{
+  closeDP(); tourState=ST.IDLE; curPlanet=-1; updDots();
+  idleCam.autoSpeed=0.0008;
+  document.getElementById('hud-hint').textContent='DRAG TO EXPLORE · CLICK PLANET TO SELECT';
+});
+
+// Raycasting
+const ray=new THREE.Raycaster(); const mouse2=new THREE.Vector2();
+glC.addEventListener('click',e=>{
+  if(dragMoved){dragMoved=false;return;}
+  const rect=glC.getBoundingClientRect();
+  mouse2.set(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);
+  ray.setFromCamera(mouse2,camera);
+  const hits=ray.intersectObjects(planetObjs.map(p=>p.mesh));
+  if(hits.length){const idx=planetObjs.findIndex(p=>p.mesh===hits[0].object);if(idx>=0)goTo(idx);}
+});
+glC.addEventListener('mousemove',e=>{
+  if(tourState!==ST.IDLE) return;
+  const rect=glC.getBoundingClientRect();
+  mouse2.set(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);
+  ray.setFromCamera(mouse2,camera);
+  const hits=ray.intersectObjects(planetObjs.map(p=>p.mesh));
+  if(hits.length){
+    glC.style.cursor='pointer';
+    const idx=planetObjs.findIndex(p=>p.mesh===hits[0].object);
+    document.getElementById('hud-hint').textContent=`[ ${REPOS[idx].name.toUpperCase()} ] — CLICK TO EXPLORE`;
+  } else {
+    glC.style.cursor='grab';
+    document.getElementById('hud-hint').textContent='DRAG TO EXPLORE · CLICK PLANET TO SELECT';
+  }
+});
+
+// ── Resize ────────────────────────────────────────────────────────────────────
+function resize(){
+  W=window.innerWidth; H=window.innerHeight;
+  starC.width=W; starC.height=H;
+  renderer.setSize(W,H);
+  camera.aspect=W/H; camera.updateProjectionMatrix();
+  composer.setSize(W,H);
+  bhUniforms.resolution.value.set(W,H);
+  bhUniforms.fov.value=camera.fov;
+}
+window.addEventListener('resize',resize);
+
+// ── Keplerian orbital physics ─────────────────────────────────────────────────
+const planetStates=REPOS.map(r=>({theta:r.orbit.phase,precessionAngle:0}));
+const _incAxis=new THREE.Vector3(1,0,0), _nodeAxis=new THREE.Vector3(0,1,0);
+
+function updatePlanets(delta,elapsed){
+  REPOS.forEach((r,i)=>{
+    const {a,e,inc,node,baseSpeed,precRate}=r.orbit;
+    const st=planetStates[i];
+    const dist=a*(1-e*e)/(1+e*Math.cos(st.theta));
+    st.theta+=baseSpeed*(a/dist)*delta*60;
+    if(st.theta>=Math.PI*2){st.theta-=Math.PI*2; st.precessionAngle+=precRate;}
+    const b=a*Math.sqrt(1-e*e), c=a*e;
+    const lx=a*Math.cos(st.theta)-c, lz=b*Math.sin(st.theta);
+    const px=lx*Math.cos(st.precessionAngle)-lz*Math.sin(st.precessionAngle);
+    const pz=lx*Math.sin(st.precessionAngle)+lz*Math.cos(st.precessionAngle);
+    const pos=new THREE.Vector3(px,0,pz);
+    pos.applyAxisAngle(_incAxis,inc); pos.applyAxisAngle(_nodeAxis,node);
+    planetObjs[i].mesh.position.copy(pos);
+    planetObjs[i].atmo.position.copy(pos);
+    planetObjs[i].mesh.rotation.y=elapsed*.3;
+  });
+}
+
+// ── Labels ────────────────────────────────────────────────────────────────────
+const projMat=new THREE.Matrix4();
+function updateLabels(){
+  projMat.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);
+  planetObjs.forEach(({mesh},i)=>{
+    const p=mesh.position.clone(); p.applyMatrix4(projMat);
+    if(p.z>1){labelEls[i].style.opacity='0';return;}
+    const sx=(p.x*.5+.5)*W, sy=(-p.y*.5+.5)*H;
+    labelEls[i].style.left=sx+'px'; labelEls[i].style.top=(sy-26)+'px';
+    const d=camera.position.distanceTo(mesh.position);
+    const base=Math.min(1,Math.max(0,(d-18)/55));
+    const hide=(tourState===ST.INSPECT&&curPlanet===i)?0:1;
+    labelEls[i].style.opacity=(base*hide*.75).toFixed(2);
+  });
+}
+
+// ── Easing ────────────────────────────────────────────────────────────────────
+function easeOutExpo(t){return t>=1?1:1-Math.pow(2,-10*t);}
+
+// ── Main loop ─────────────────────────────────────────────────────────────────
+const clock=new THREE.Clock();
+
+function frame(now){
+  const delta=clock.getDelta(), el=clock.elapsedTime;
+
+  updatePlanets(delta,el);
+
+  // ── Camera per state ─────────────────────────────────────────────────────
+  if(tourState===ST.TRAVEL){
+    const prog=Math.min(1,(now-tStart)/TRAVEL_MS);
+    const ep=easeOutExpo(prog);
+    const tTo=getPCamPos(curPlanet); // live: follow moving planet
+    camera.position.lerpVectors(tFrom,tTo,ep);
+    camera.lookAt(planetObjs[curPlanet].mesh.position);
+    if(prog>=1){
+      tourState=ST.INSPECT; inspStart=now; openDP(curPlanet);
+      document.getElementById('hud-hint').textContent=`EXPLORING ${REPOS[curPlanet].name.toUpperCase()}`;
+    }
+  } else if(tourState===ST.INSPECT||tourState===ST.PAUSED){
+    const ppos=planetObjs[curPlanet].mesh.position;
+    const orbT=(now-inspStart)*.00038, d=36;
+    camera.position.set(ppos.x+Math.cos(orbT)*d, ppos.y+14+Math.sin(orbT*.4)*5, ppos.z+Math.sin(orbT)*d);
+    camera.lookAt(ppos);
+    if(playing&&tourState===ST.INSPECT&&(now-inspStart)>INSPECT_MS) goTo(curPlanet+1);
+  } else {
+    // IDLE: auto-rotate + user drag (full spherical)
+    if(!isDragging) idleCam.azimuth+=idleCam.autoSpeed;
+    syncIdleCamera();
+  }
+
+  // Sync BH shader from actual camera (the core fix — always after camera moves)
+  bhUniforms.time.value=el;
+  syncBHFromCamera();
+  bhUniforms.cam_vel.value.copy(tourState===ST.IDLE ? idleCamVel() : new THREE.Vector3());
+
+  const azimuth=Math.atan2(camera.position.x,camera.position.z);
+  drawStars(el,azimuth);
+  updateLabels();
+  composer.render();
+  requestAnimationFrame(frame);
+}
+
+// ── Intro ─────────────────────────────────────────────────────────────────────
+async function runIntro(){
+  const fill=document.getElementById('warp-fill'), status=document.getElementById('warp-status');
+  const msgs=['CALIBRATING WORMHOLE...','FOLDING SPACETIME...','APPROACHING EVENT HORIZON...','COSMOS ONLINE'];
+  let mi=0; fill.style.width='100%';
+  const iv=setInterval(()=>{if(mi<msgs.length)status.textContent=msgs[mi++];else clearInterval(iv);},520);
+  let wp=0;const warpStep=()=>{wp=Math.min(1,wp+.04);warpProgress=wp;if(wp<1)requestAnimationFrame(warpStep);};
+  requestAnimationFrame(warpStep);
+  await new Promise(r=>setTimeout(r,2350));
+  warpMode=false;
+  document.getElementById('warp').classList.add('hide');
+  await new Promise(r=>setTimeout(r,950));
+  document.getElementById('warp').style.display='none';
+  document.body.classList.add('loaded');
+  resize();
+  camera.position.set(0,300,500);
+  await new Promise(r=>setTimeout(r,600));
+  goTo(0);
+  document.getElementById('hud-hint').textContent='ENTERING COSMOS — TOUR STARTS AUTOMATICALLY';
+}
+
+resize();
+requestAnimationFrame(frame);
+runIntro();
+</script>
+</body>
+</html>

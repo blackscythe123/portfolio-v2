@@ -20,12 +20,18 @@ Four standalone HTML pages — each is a single file with all CSS and JS inlined
 
 - `ascii-bg.html` — Home page: ASCII art canvas, gravity physics, typed prompt, page-tear transition to skills/projects
 - `skills.html` — Skills page: galaxy image ASCII rendering, interactive skill cores, camera zoom-pan
-- `projects.html` — Artifacts page: Genshin Impact–style artifact screen with golden 3D orbs orbiting the guardian character, Pretext obstacle-aware text columns, animated detail panel
+- `projects.html` — Cosmos page: real geodesic-raytraced black hole (see `blackhole.md`) with 6 planets on different orbital inclinations. ASCII text starfield, warp intro, auto-tour camera (play/pause), Genshin-style detail panel.
 - `cloth-tear.html` — Standalone WebGL demo: Three.js cloth simulation with GLSL shader tearing
 
 Image assets (`galaxy*.webp/jpg`, `home-original.webp`, `guardian.webp`, etc.) live at the repo root and are referenced by relative path.
 
-External dependencies load via CDN only: `@chenglou/pretext@0.1.4` (text measurement), Three.js r128 (cloth-tear only), Google Fonts.
+External dependencies load via CDN only: `@chenglou/pretext@0.1.4` (text measurement), Three.js r128 (cloth-tear only), Three.js r0.158.0 via importmap (projects.html), Google Fonts.
+
+## Black hole renderer
+
+`projects.html` uses the real geodesic raytracer from `./threejs-blackhole/` (cloned from https://github.com/vlwkaos/threejs-blackhole.git).
+
+**Read `blackhole.md` before touching projects.html.** It documents the shader architecture, coordinate system (Schwarzschild units), all uniforms, texture paths, default config values, and the compositing pattern for adding planets on top of the raytraced background.
 
 ## Core Animation Systems
 
@@ -59,17 +65,13 @@ Camera zoom-pan: clicking a core sets `cam.targetScale = 3.5` and `cam.targetX/Y
 ### WebGL Cloth Tear (cloth-tear.html)
 Three.js with custom GLSL vertex + fragment shaders. The "bridging triangle discard" trick: vertices are assigned a `side` attribute (0 = above cut, 1 = below). Fragment shader discards pixels where interpolated `vSide` falls between 0 and 1 — this cleanly removes the polygons that would bridge the torn edges. The tear line uses multi-octave sine noise for irregular edges.
 
-### Artifact Orbit System (projects.html)
-Repos are rendered as golden 3D orbs on an elliptical orbit around the `guardian.webp` character (drawn cropped to top 84% so feet go off-screen). Each frame:
-1. Orb position = `cx + cos(angle) * orbRx, cy + sin(angle) * orbRy` where `angle = angleOffset + elapsed * 0.20`
-2. `drawGoldenOrb()` renders a sphere via two radial gradients (offset light source for 3D), two counter-rotating ellipse rings, and a specular highlight — all on the 2D canvas (no WebGL)
-3. Labels use `layoutNextLine` in a loop, shrinking `maxWidth` each iteration when another orb occupies the same vertical band
-
-Artifact state machine: `S.ORB → S.FLY → S.EQP → S.RET → S.ORB`. Flight uses a quadratic Bézier (`bQ()`) with ease-out cubic timing toward `handX/handY` (guardian's chest at ~50% screen width, 52% height).
-
-Left (`#art-grid`) and right (`#detail-panel`) panels slide in on artifact selection using CSS `transform: translateX`. The detail panel renders Genshin-style stats (seeded HP/ATK/ER/CRIT derived from repo name hash) and lore text via `layoutWithLines`.
-
-Left/right `drawCol()` text columns are hidden when the detail panel is open to avoid overlap.
+### Cosmos / Black Hole System (projects.html)
+See `blackhole.md` for the full shader and rendering details. Summary:
+- Black hole rendered via real geodesic raytracing GLSL on a `PlaneGeometry(2,2)` — `renderOrder=-1000`, `depthTest=false`
+- 6 planet meshes (Three.js spheres) added to same scene, rendered on top via higher renderOrder
+- Shader uniforms driven by an `Observer` class (Schwarzschild-unit orbital camera): `cam_pos`, `cam_dir`, `cam_vel`, `fov`
+- Tour state machine: `IDLE → TRAVEL → INSPECT → PAUSED` — camera eases to each planet, orbits slowly, advances after 5.5s
+- Genshin-style detail panel slides in from right on planet selection
 
 ## Navigation
 
