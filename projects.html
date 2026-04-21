@@ -508,6 +508,12 @@ glC.addEventListener('touchstart',e=>{onDragStart(e.touches[0].clientX,e.touches
 window.addEventListener('touchmove',e=>{onDragMove(e.touches[0].clientX,e.touches[0].clientY);},{passive:true});
 window.addEventListener('touchend',onDragEnd);
 
+glC.addEventListener('wheel', e => {
+  if (tourState !== ST.IDLE) return;
+  idleCam.radius += e.deltaY * 0.3;
+  idleCam.radius = Math.max(90, Math.min(900, idleCam.radius));
+}, { passive: true });
+
 // ── Tour FSM ──────────────────────────────────────────────────────────────────
 const ST={IDLE:0,TRAVEL:1,INSPECT:2,PAUSED:3};
 let tourState=ST.IDLE, curPlanet=-1, playing=false;
