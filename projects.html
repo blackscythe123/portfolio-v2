@@ -594,7 +594,8 @@ function resize(){
   renderer.setSize(W,H);
   camera.aspect=W/H; camera.updateProjectionMatrix();
   composer.setSize(W,H);
-  bhUniforms.resolution.value.set(W,H);
+  const pr=renderer.getPixelRatio();
+  bhUniforms.resolution.value.set(W*pr,H*pr);
   bhUniforms.fov.value=camera.fov;
 }
 window.addEventListener('resize',resize);
