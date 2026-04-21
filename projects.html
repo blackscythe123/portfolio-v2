@@ -512,18 +512,23 @@ window.addEventListener('touchend',onDragEnd);
 const ST={IDLE:0,TRAVEL:1,INSPECT:2,PAUSED:3};
 let tourState=ST.IDLE, curPlanet=-1, playing=false;
 let tFrom=new THREE.Vector3(), tStart=0;
-const TRAVEL_MS=2600, INSPECT_MS=5500;
+const TRAVEL_MS=3200, INSPECT_MS=5500;
 let inspStart=0;
 
-function getPCamPos(idx){
-  const p=planetObjs[idx].mesh.position.clone();
-  return p.clone().add(p.clone().normalize().multiplyScalar(36)).add(new THREE.Vector3(0,16,0));
+let rotFrom=new THREE.Quaternion();
+const _dummyCam=new THREE.PerspectiveCamera();
+function getPlanetCamOffset(now){
+  const orbT=now*.0003;
+  return new THREE.Vector3(Math.cos(orbT)*38, 14+Math.sin(orbT*.4)*6, Math.sin(orbT)*38);
 }
 function goTo(idx){
   if(idx<0)idx=REPOS.length-1;
   if(idx>=REPOS.length)idx=0;
   closeDP(); curPlanet=idx; tourState=ST.TRAVEL;
-  tStart=performance.now(); tFrom.copy(camera.position); updDots();
+  tStart=performance.now(); 
+  tFrom.copy(camera.position); 
+  rotFrom.copy(camera.quaternion);
+  updDots();
 }
 function openDP(idx){
   const r=REPOS[idx];const[cr,cg,cb]=r.col;
@@ -657,18 +662,22 @@ function frame(now){
   // ── Camera per state ─────────────────────────────────────────────────────
   if(tourState===ST.TRAVEL){
     const prog=Math.min(1,(now-tStart)/TRAVEL_MS);
-    const ep=easeOutExpo(prog);
-    const tTo=getPCamPos(curPlanet); // live: follow moving planet
+    const ep=prog<.5 ? 4*prog*prog*prog : 1-Math.pow(-2*prog+2,3)/2;
+    const ppos=planetObjs[curPlanet].mesh.position;
+    const tTo=ppos.clone().add(getPlanetCamOffset(now));
+    
     camera.position.lerpVectors(tFrom,tTo,ep);
-    camera.lookAt(planetObjs[curPlanet].mesh.position);
+    _dummyCam.position.copy(camera.position);
+    _dummyCam.lookAt(ppos);
+    camera.quaternion.slerpQuaternions(rotFrom,_dummyCam.quaternion,ep);
+    
     if(prog>=1){
       tourState=ST.INSPECT; inspStart=now; openDP(curPlanet);
       document.getElementById('hud-hint').textContent=`EXPLORING ${REPOS[curPlanet].name.toUpperCase()}`;
     }
   } else if(tourState===ST.INSPECT||tourState===ST.PAUSED){
     const ppos=planetObjs[curPlanet].mesh.position;
-    const orbT=(now-inspStart)*.00038, d=36;
-    camera.position.set(ppos.x+Math.cos(orbT)*d, ppos.y+14+Math.sin(orbT*.4)*5, ppos.z+Math.sin(orbT)*d);
+    camera.position.copy(ppos.clone().add(getPlanetCamOffset(now)));
     camera.lookAt(ppos);
     if(playing&&tourState===ST.INSPECT&&(now-inspStart)>INSPECT_MS) goTo(curPlanet+1);
   } else {
