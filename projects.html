@@ -134,32 +134,32 @@ const REPOS = [
     desc:'Interactive web experience in pure HTML — no frameworks, no build step. A study in raw browser APIs and creative canvas rendering.',
     url:'https://github.com/blackscythe123/ada',
     col:[200,190,185], atmo:[.9,.8,.7],
-    orbit:{a:52,e:0.38,inc:0.15,node:0.0,baseSpeed:0.0072,precRate:0.006,phase:0} },
+    orbit:{a:85,e:0.15,inc:0.15,node:0.0,baseSpeed:0.0062,precRate:0.006,phase:0} },
   { name:'dbms',        lang:'Shell',      stars:0, planet:'earth',
     desc:'Database management system built from scratch with shell scripting — storage, indexing and query execution without a runtime.',
     url:'https://github.com/blackscythe123/dbms',
     col:[70,160,255],  atmo:[.18,.6,1],
-    orbit:{a:70,e:0.22,inc:-0.25,node:1.05,baseSpeed:0.0055,precRate:0.004,phase:1.26} },
+    orbit:{a:110,e:0.12,inc:-0.25,node:1.05,baseSpeed:0.0050,precRate:0.004,phase:1.26} },
   { name:'ExpenseIQ',   lang:'JavaScript', stars:2, planet:'jupiter',
     desc:'Smart personal expense tracker with ML-driven category intelligence, visual analytics dashboards and real-time budgeting.',
     url:'https://github.com/blackscythe123/ExpenseIQ',
     col:[220,180,120], atmo:[.9,.7,.4],
-    orbit:{a:98,e:0.18,inc:0.42,node:2.20,baseSpeed:0.0038,precRate:0.003,phase:2.51} },
+    orbit:{a:135,e:0.14,inc:0.42,node:2.20,baseSpeed:0.0042,precRate:0.003,phase:2.51} },
   { name:'openclaude',  lang:'CLI',        stars:0, planet:'mars',
     desc:'Open-source coding agent CLI supporting OpenAI, Gemini, DeepSeek, Ollama and 200+ models via compatible APIs.',
     url:'https://github.com/blackscythe123/openclaude',
     col:[210,80,50],   atmo:[.8,.3,.2],
-    orbit:{a:62,e:0.45,inc:-0.35,node:3.14,baseSpeed:0.0064,precRate:0.007,phase:3.77} },
+    orbit:{a:160,e:0.18,inc:-0.35,node:3.14,baseSpeed:0.0035,precRate:0.005,phase:3.77} },
   { name:'FarmLedge',   lang:'TypeScript', stars:2, planet:'saturn',
     desc:'Transparent agricultural supply chain platform tracking crops from farm to fork with full on-chain provenance records.',
     url:'https://github.com/blackscythe123/FarmLedge',
     col:[200,175,130], atmo:[.8,.7,.5],
-    orbit:{a:88,e:0.28,inc:0.30,node:4.19,baseSpeed:0.0042,precRate:0.004,phase:5.03} },
+    orbit:{a:185,e:0.11,inc:0.30,node:4.19,baseSpeed:0.0028,precRate:0.004,phase:5.03} },
   { name:'portfolio-v2',lang:'Canvas',     stars:3, planet:'neptune',
     desc:'This very cosmos — ASCII art universe, WebGL black hole, gravitational lensing, 6-planet tour. Pure browser APIs, zero frameworks.',
     url:'https://github.com/blackscythe123/portfolio-v2',
     col:[80,130,255],  atmo:[.3,.5,1],
-    orbit:{a:118,e:0.12,inc:0.52,node:5.24,baseSpeed:0.0028,precRate:0.002,phase:1.88} },
+    orbit:{a:210,e:0.08,inc:0.52,node:5.24,baseSpeed:0.0022,precRate:0.002,phase:1.88} },
 ];
 function seeded(s,o,r){let h=o;for(const c of s)h=(h*31+c.charCodeAt(0))&0xffff;return h%r;}
 function rarity(s){return s>=3?'★★★★★':s>=2?'★★★★☆':s>=1?'★★★☆☆':'★★☆☆☆';}
@@ -327,12 +327,11 @@ txLoader.load('threejs-blackhole/assets/accretion_disk.png',t=>{bhUniforms.disk_
 // placing an invisible sphere at the BH origin that ONLY writes to the depth
 // buffer (colorWrite:false). Any planet fragment further from camera than this
 // sphere's surface will fail the depth test and get correctly hidden.
-// Radius 44 = just inside the accretion disk inner edge (Sch r=2 = 50 world units),
-// big enough to represent the visual black shadow (~2.6×Rs ≈ 65 world from afar
-// but we stay conservative so close-approach planets still peek through).
+// We use a radius of 65 here (≈ 2.6 × BH_SCALE) to closely match the apparent
+// size of the black hole's shadow due to gravitational lensing.
 const bhOccluder=new THREE.Mesh(
-  new THREE.SphereGeometry(44,64,32),
-  new THREE.MeshBasicMaterial({colorWrite:false,depthWrite:true,side:THREE.FrontSide})
+  new THREE.CircleGeometry(65, 64),
+  new THREE.MeshBasicMaterial({colorWrite:false,depthWrite:true})
 );
 // Render AFTER the BH shader quad (-1000) but BEFORE planets (0)
 // so depth is written first, then planet fragments are tested against it.
@@ -389,6 +388,7 @@ function syncBHFromCamera(){
   camera.updateMatrixWorld(false);
   _camUp.setFromMatrixColumn(camera.matrixWorld,1);
   bhUniforms.cam_up.value.copy(_camUp);
+  bhOccluder.lookAt(camera.position);
 }
 
 // ── Planets ───────────────────────────────────────────────────────────────────
