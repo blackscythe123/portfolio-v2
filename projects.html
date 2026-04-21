@@ -113,7 +113,7 @@ body.loaded #cr{transform:scaleX(0)}
   <div id="hud-hint">INITIALIZING COSMOS...</div>
   <div id="tour-ctrl">
     <button class="tc" id="btn-prev">◀ PREV</button>
-    <button class="tc on" id="btn-play">⏸ PAUSE</button>
+    <button class="tc" id="btn-play">▶ PLAY</button>
     <button class="tc" id="btn-next">NEXT ▶</button>
   </div>
   <div id="pdots"></div>
@@ -510,7 +510,7 @@ window.addEventListener('touchend',onDragEnd);
 
 // ── Tour FSM ──────────────────────────────────────────────────────────────────
 const ST={IDLE:0,TRAVEL:1,INSPECT:2,PAUSED:3};
-let tourState=ST.IDLE, curPlanet=-1, playing=true;
+let tourState=ST.IDLE, curPlanet=-1, playing=false;
 let tFrom=new THREE.Vector3(), tStart=0;
 const TRAVEL_MS=2600, INSPECT_MS=5500;
 let inspStart=0;
@@ -550,7 +550,11 @@ function closeDP(){document.getElementById('dp').classList.remove('open');}
 document.getElementById('btn-play').addEventListener('click',()=>{
   playing=!playing;
   const b=document.getElementById('btn-play');
-  if(playing){b.textContent='⏸ PAUSE';b.classList.add('on');if(tourState===ST.PAUSED){tourState=ST.INSPECT;inspStart=performance.now();}}
+  if(playing){
+    b.textContent='⏸ PAUSE';b.classList.add('on');
+    if(tourState===ST.IDLE){goTo(curPlanet>=0?curPlanet:0);}
+    else if(tourState===ST.PAUSED){tourState=ST.INSPECT;inspStart=performance.now();}
+  }
   else{b.textContent='▶ PLAY';b.classList.remove('on');if(tourState===ST.INSPECT)tourState=ST.PAUSED;}
 });
 document.getElementById('btn-prev').addEventListener('click',()=>goTo(curPlanet-1));
@@ -700,10 +704,9 @@ async function runIntro(){
   document.getElementById('warp').style.display='none';
   document.body.classList.add('loaded');
   resize();
-  camera.position.set(0,300,500);
+  syncIdleCamera();
   await new Promise(r=>setTimeout(r,600));
-  goTo(0);
-  document.getElementById('hud-hint').textContent='ENTERING COSMOS — TOUR STARTS AUTOMATICALLY';
+  document.getElementById('hud-hint').textContent='DRAG TO EXPLORE · PRESS PLAY TO START TOUR';
 }
 
 resize();
