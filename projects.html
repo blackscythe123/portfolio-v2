@@ -11,7 +11,7 @@
 body{background:#000;color:#ccc;font-family:'JetBrains Mono',monospace;overflow:hidden;width:100vw;height:100vh;user-select:none}
 canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 #star-canvas{z-index:0}
-#gl-canvas{z-index:1;background:transparent;cursor:grab;mix-blend-mode:screen}
+#gl-canvas{z-index:1;background:transparent;cursor:grab}
 #gl-canvas:active{cursor:grabbing}
 
 #cl,#cr{position:fixed;top:0;z-index:100;width:50%;height:100%;background:#000;transition:transform 1.4s cubic-bezier(.77,0,.18,1)}
@@ -139,7 +139,7 @@ try {
 const FONT_PX = 9;
 const FONT_STR = `${FONT_PX}px "Courier New", Courier, monospace`;
 const CHARS_SRC = '123456OY@';
-let charW = FONT_PX * 0.601;
+let charW = FONT_PX * 1.601;
 const charH = FONT_PX;
 
 await document.fonts.ready;
@@ -198,7 +198,41 @@ function setupAsciiGrid() {
     }
   }
 }
-bgImgObj.onload = setupAsciiGrid;
+function buildAsciiPanorama(){
+  if(!charW||!bgImgObj.complete||!bgImgObj.naturalWidth) return;
+  const PW=1440,PH=720;
+  const oc=new OffscreenCanvas(PW,PH);
+  const ox=oc.getContext('2d');
+  // Sample milkyway into pano-sized grid
+  const tmp=new OffscreenCanvas(PW,PH);
+  tmp.getContext('2d').drawImage(bgImgObj,0,0,PW,PH);
+  const {data}=tmp.getContext('2d').getImageData(0,0,PW,PH);
+  const pCols=Math.floor(PW/charW), pRows=Math.floor(PH/charH);
+  ox.clearRect(0,0,PW,PH);
+  ox.font=FONT_STR; ox.textBaseline='top';
+  for(let r=0;r<pRows;r++){
+    const y=r*charH;
+    const iy=Math.floor(r/pRows*PH);
+    for(let c=0;c<pCols;c++){
+      const x=c*charW;
+      const ix=Math.floor(c/pCols*PW);
+      const p=(iy*PW+ix)*4;
+      const cr=data[p],cg=data[p+1],cb=data[p+2];
+      const b=0.299*cr+0.587*cg+0.114*cb;
+      if(b<1) continue;
+      const bG=Math.pow(b/255,0.38)*255;
+      const ci=Math.max(1,Math.floor((bG/255)*(CHARS_SRC.length-1)));
+      const f=ci/(CHARS_SRC.length-1);
+      ox.fillStyle=`rgba(${Math.min(255,cr*5+25+f*80)|0},${Math.min(255,cg*4+18+f*65)|0},${Math.min(255,cb*6+55+f*55)|0},${(f*.55+.12).toFixed(2)})`;
+      ox.fillText(CHARS_SRC[ci],x,y);
+    }
+  }
+  const panoTex=new THREE.CanvasTexture(oc);
+  panoTex.wrapS=THREE.RepeatWrapping;
+  panoTex.minFilter=THREE.LinearFilter; panoTex.magFilter=THREE.LinearFilter;
+  bhUniforms.bg_texture.value=panoTex;
+}
+bgImgObj.onload=()=>{setupAsciiGrid();buildAsciiPanorama();};
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 const REPOS = [
@@ -287,7 +321,7 @@ const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(65,1,.5,2000);
 camera.position.set(0,0,250);
 
-scene.add(new THREE.AmbientLight(0x111133,.30));
+scene.add(new THREE.AmbientLight(0x334466,.55));
 const diskLight=new THREE.PointLight(0xffaa44,3.5,500);
 scene.add(diskLight);
 
@@ -351,8 +385,11 @@ void main(){
       }
     }
   }
-  // Background rays are transparent — ASCII milkyway on star-canvas shows through
-  gl_FragColor=vec4(color.rgb*ray_intensity, clamp(color.a,0.0,1.0));
+  // Sample ASCII panorama using ray direction — full 360° equirectangular sky
+  vec2 sphereUV=to_spherical(normalize(velocity));
+  vec4 ascii=texture2D(bg_texture,sphereUV);
+  float bgBlend=1.0-smoothstep(0.0,0.04,color.a);
+  gl_FragColor=vec4(color.rgb*ray_intensity+ascii.rgb*ascii.a*bgBlend, clamp(color.a+ascii.a*bgBlend,0.0,1.0));
 }`;
 
 const bhUniforms={
@@ -366,11 +403,13 @@ const bhUniforms={
 const bhMesh=new THREE.Mesh(
   new THREE.PlaneGeometry(2,2),
   new THREE.ShaderMaterial({uniforms:bhUniforms,vertexShader:BH_VERT,fragmentShader:BH_FRAG,
-    transparent:true,depthTest:false,depthWrite:false,glslVersion:THREE.GLSL1}));
+    transparent:false,depthTest:false,depthWrite:false,glslVersion:THREE.GLSL1}));
 bhMesh.frustumCulled=false; bhMesh.renderOrder=-1000; scene.add(bhMesh);
 
 const txLoader=new THREE.TextureLoader();
-txLoader.load('threejs-blackhole/assets/milkyway.jpg',t=>{bhUniforms.bg_texture.value=t;});
+const asciiTex=new THREE.CanvasTexture(starC);
+asciiTex.minFilter=THREE.LinearFilter; asciiTex.magFilter=THREE.LinearFilter;
+bhUniforms.bg_texture.value=asciiTex;
 txLoader.load('threejs-blackhole/assets/star_noise.png',t=>{bhUniforms.star_texture.value=t;});
 txLoader.load('threejs-blackhole/assets/accretion_disk.png',t=>{bhUniforms.disk_texture.value=t;});
 
@@ -383,13 +422,21 @@ txLoader.load('threejs-blackhole/assets/accretion_disk.png',t=>{bhUniforms.disk_
 // We use a radius of 65 here (≈ 2.6 × BH_SCALE) to closely match the apparent
 // size of the black hole's shadow due to gravitational lensing.
 const bhOccluder=new THREE.Mesh(
-  new THREE.CircleGeometry(65, 64),
+  new THREE.SphereGeometry(65, 64, 64),
   new THREE.MeshBasicMaterial({colorWrite:false,depthWrite:true})
 );
 // Render AFTER the BH shader quad (-1000) but BEFORE planets (0)
 // so depth is written first, then planet fragments are tested against it.
 bhOccluder.renderOrder=-500;
 scene.add(bhOccluder);
+
+const diskOccluder=new THREE.Mesh(
+  new THREE.RingGeometry(50, 150, 64),
+  new THREE.MeshBasicMaterial({colorWrite:false,depthWrite:false,side:THREE.DoubleSide})
+);
+diskOccluder.rotation.x = Math.PI / 2;
+diskOccluder.renderOrder=-500;
+scene.add(diskOccluder);
 
 // ── BH_SCALE: 1 Schwarzschild unit = BH_SCALE world units ────────────────────
 const BH_SCALE=25;
@@ -460,7 +507,13 @@ REPOS.forEach((repo,i)=>{
   const radius=5.8+seeded(repo.name,3,20)*.14;
   const mesh=new THREE.Mesh(
     new THREE.SphereGeometry(radius,64,32),
-    new THREE.MeshPhongMaterial({map:pTex[repo.planet],shininess:12,specular:new THREE.Color(.04,.04,.06)})
+    new THREE.MeshStandardMaterial({
+      color: new THREE.Color(cr/255, cg/255, cb/255),
+      map: pTex[repo.planet] || null,
+      roughness: 0.7,
+      metalness: 0.1,
+      emissive: new THREE.Color(cr/255*.12, cg/255*.12, cb/255*.12)
+    })
   );
   mesh.frustumCulled=false; scene.add(mesh);
 
@@ -510,7 +563,21 @@ function updDots(){
 // ── Post-processing ───────────────────────────────────────────────────────────
 const composer=new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene,camera));
-composer.addPass(new UnrealBloomPass(new THREE.Vector2(1,1),0.55,.3,.88));
+const bloomPass=new UnrealBloomPass(new THREE.Vector2(1,1),0.55,.3,.88);
+composer.addPass(bloomPass);
+// Fix: Output proper alpha to the canvas so opaque objects hide the DOM behind them.
+// We use CustomBlending to copy both the RGB and Alpha from the post-processing
+// composite shader directly to the WebGL Canvas without killing the alpha channel.
+if(bloomPass.compositeMaterial){
+  bloomPass.compositeMaterial.blending=THREE.CustomBlending;
+  bloomPass.compositeMaterial.blendEquation=THREE.AddEquation;
+  bloomPass.compositeMaterial.blendSrc=THREE.OneFactor;
+  bloomPass.compositeMaterial.blendDst=THREE.ZeroFactor;
+  bloomPass.compositeMaterial.blendEquationAlpha=THREE.AddEquation;
+  bloomPass.compositeMaterial.blendSrcAlpha=THREE.OneFactor;
+  bloomPass.compositeMaterial.blendDstAlpha=THREE.ZeroFactor;
+  bloomPass.compositeMaterial.needsUpdate=true;
+}
 
 // ── MOUSE DRAG: full spherical orbit (azimuth + elevation) ───────────────────
 // Previously only theta (horizontal) was controllable.
