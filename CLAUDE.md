@@ -25,7 +25,7 @@ Four standalone HTML pages — each is a single file with all CSS and JS inlined
 
 Image assets (`galaxy*.webp/jpg`, `home-original.webp`, `guardian.webp`, etc.) live at the repo root and are referenced by relative path.
 
-External dependencies load via CDN only: `@chenglou/pretext@0.1.4` (text measurement), Three.js r128 (cloth-tear only), Three.js r0.158.0 via importmap (projects.html), Google Fonts.
+External dependencies load via CDN only: `@chenglou/pretext` (text measurement), Three.js r128 (cloth-tear only), Three.js r0.158.0 via importmap (projects.html), Google Fonts.
 
 ## Black hole renderer
 
