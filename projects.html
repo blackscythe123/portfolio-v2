@@ -11,7 +11,7 @@
 body{background:#000;color:#ccc;font-family:'JetBrains Mono',monospace;overflow:hidden;width:100vw;height:100vh;user-select:none}
 canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 #star-canvas{z-index:0}
-#gl-canvas{z-index:1;background:transparent;cursor:grab}
+#gl-canvas{z-index:1;background:transparent;cursor:grab;mix-blend-mode:screen}
 #gl-canvas:active{cursor:grabbing}
 
 #cl,#cr{position:fixed;top:0;z-index:100;width:50%;height:100%;background:#000;transition:transform 1.4s cubic-bezier(.77,0,.18,1)}
@@ -128,6 +128,78 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
+// ── ASCII ENGINE VIA PRETEXT ──────────────────────────────────────────────────
+let layoutWithLines, prepareWithSegments;
+try {
+  const m = await import('https://esm.sh/@chenglou/pretext@0.1.4');
+  layoutWithLines     = m.layoutWithLines;
+  prepareWithSegments = m.prepareWithSegments;
+} catch(e) {}
+
+const FONT_PX = 9;
+const FONT_STR = `${FONT_PX}px "Courier New", Courier, monospace`;
+const CHARS_SRC = '123456OY@';
+let charW = FONT_PX * 0.601;
+const charH = FONT_PX;
+
+await document.fonts.ready;
+if (prepareWithSegments && layoutWithLines) {
+  try {
+    const p = prepareWithSegments('X'.repeat(100), FONT_STR);
+    const r = layoutWithLines(p, Infinity, charH);
+    if (r.lines?.length) charW = r.lines[0].width / 100;
+  } catch(e) {}
+} else {
+   const oc = new OffscreenCanvas(400,20).getContext('2d');
+   oc.font = FONT_STR;
+   charW = oc.measureText('X'.repeat(50)).width / 50;
+}
+
+let cols, rows, N, origChars;
+let colR, colG, colB;
+let bgImgObj = new Image();
+bgImgObj.crossOrigin = 'anonymous';
+bgImgObj.src = 'threejs-blackhole/assets/milkyway.jpg';
+
+function setupAsciiGrid() {
+  if (!W || !H) return;
+  cols = Math.floor(W / charW);
+  rows = Math.floor(H / charH);
+  N = cols * rows;
+  origChars = new Uint8Array(N);
+  colR = new Uint8Array(N);
+  colG = new Uint8Array(N);
+  colB = new Uint8Array(N);
+
+  if (!bgImgObj.complete || bgImgObj.naturalWidth === 0) return;
+
+  const src = document.createElement('canvas');
+  src.width = cols; src.height = rows;
+  const sx = src.getContext('2d');
+  
+  const aspect = bgImgObj.naturalWidth / bgImgObj.naturalHeight;
+  const screenAspect = cols / rows;
+  let dw = cols, dh = rows, dx = 0, dy = 0;
+  if(screenAspect > aspect) { dh = cols / aspect; dy = (rows - dh)/2; }
+  else { dw = rows * aspect; dx = (cols - dw)/2; }
+  
+  sx.drawImage(bgImgObj, dx, dy, dw, dh);
+  const { data } = sx.getImageData(0, 0, cols, rows);
+  
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = r*cols + c;
+      const p = idx*4;
+      colR[idx] = data[p]; colG[idx] = data[p+1]; colB[idx] = data[p+2];
+      const b = 0.299*data[p] + 0.587*data[p+1] + 0.114*data[p+2];
+      // Gamma-boost so dark space regions become visible characters
+      const bGamma = Math.pow(Math.max(0,b)/255, 0.38)*255;
+      origChars[idx] = b < 1 ? 0 : Math.max(1, Math.floor((bGamma/255)*(CHARS_SRC.length-1)));
+    }
+  }
+}
+bgImgObj.onload = setupAsciiGrid;
+
 // ── Data ─────────────────────────────────────────────────────────────────────
 const REPOS = [
   { name:'ada',         lang:'HTML',       stars:0, planet:'mercury',
@@ -170,45 +242,37 @@ const glC=document.getElementById('gl-canvas');
 let W,H;
 
 // ── ASCII starfield ───────────────────────────────────────────────────────────
-const SCHARS=['·','.','+','*','✦','✧','◦','○','•'];
-const STARS=Array.from({length:480},(_,i)=>({
-  nx:Math.random(),ny:Math.random(),ch:SCHARS[i%SCHARS.length],
-  sz:7+Math.floor(Math.random()*6),base:.12+Math.random()*.38,
-  tw:Math.random()*Math.PI*2,ts:.4+Math.random()*1.6,
-  col:Math.random()<.15?'rgba(200,160,255,':Math.random()<.3?'rgba(180,220,255,':'rgba(205,195,235,',
-}));
-const NEBULA_WORDS=['COSMOS','QUANTUM','VOID','SINGULARITY','ENTROPY','GENESIS','AXIOM','CIPHER','NEXUS'];
-const NEBULAS=Array.from({length:18},(_,i)=>({
-  nx:.05+Math.random()*.9,ny:.05+Math.random()*.9,
-  word:NEBULA_WORDS[i%NEBULA_WORDS.length],alpha:.025+Math.random()*.04,
-}));
 let warpMode=true, warpProgress=0;
 
 function drawStars(t,azimuth){
   starX.clearRect(0,0,W,H);
-  const px=azimuth*0.032;
-  if(warpMode){
-    const wl=warpProgress;
-    for(const s of STARS){
-      const sx=((s.nx+px*.06)%1)*W, sy=s.ny*H;
-      const len=wl*W*.35*s.base;
-      starX.strokeStyle=`rgba(200,180,255,${(s.base*wl).toFixed(3)})`;
-      starX.lineWidth=.8; starX.beginPath(); starX.moveTo(sx,sy);
-      starX.lineTo(sx-len*(sx/W-.5)*2,sy-len*(sy/H-.5)*1.5); starX.stroke();
+  
+  if(!cols || !origChars || origChars.length===0) return;
+  starX.font=FONT_STR;
+  starX.textBaseline='top';
+  
+  const px=azimuth/(Math.PI*2);
+  const cOffset=Math.floor(px*cols)%cols;
+
+  for (let r = 0; r < rows; r++) {
+    const y = r * charH;
+    for (let c = 0; c < cols; c++) {
+      const actualC = (c + cOffset + cols) % cols;
+      const idx = r*cols + actualC;
+      
+      const chIdx = origChars[idx];
+      if (chIdx === 0) continue; 
+      
+      const cr=colR[idx], cg=colG[idx], cb2=colB[idx];
+      const f=chIdx/(CHARS_SRC.length-1); // 0..1 relative brightness
+      // Boost dark milkyway RGB to visible range with blue-purple space tint
+      const rr=(Math.min(255,cr*5+25+f*80))|0;
+      const rg=(Math.min(255,cg*4+18+f*65))|0;
+      const rb=(Math.min(255,cb2*6+55+f*55))|0;
+      const a=(f*0.55+0.12).toFixed(2);
+      starX.fillStyle=`rgba(${rr},${rg},${rb},${a})`;
+      starX.fillText(CHARS_SRC[chIdx], c * charW, y);
     }
-    return;
-  }
-  starX.font='8px "Courier New",monospace';
-  for(const nb of NEBULAS){
-    starX.fillStyle=`rgba(140,80,255,${nb.alpha.toFixed(3)})`;
-    starX.fillText(nb.word,((nb.nx+px*.01)%1)*W,nb.ny*H);
-  }
-  for(const s of STARS){
-    const sx=((s.nx+px*.05)%1)*W, sy=s.ny*H;
-    const a=s.base+Math.sin(t*s.ts+s.tw)*.1;
-    starX.font=`${s.sz}px "Courier New",monospace`;
-    starX.fillStyle=`${s.col}${a.toFixed(3)})`;
-    starX.fillText(s.ch,sx,sy);
   }
 }
 
@@ -254,7 +318,7 @@ void main(){
   vec3 pixel_pos=cam_pos+fwd+nright*uv.x*uvfov+up*uv.y*uvfov;
   vec3 ray_dir=normalize(pixel_pos-cam_pos);
   if(lorentz_transform) ray_dir=lorentz_transform_velocity(ray_dir,cam_vel);
-  vec4 color=vec4(0,0,0,1); vec3 point=cam_pos; vec3 velocity=ray_dir;
+  vec4 color=vec4(0.0); vec3 point=cam_pos; vec3 velocity=ray_dir;
   vec3 cv=cross(point,velocity); float h2=dot(cv,cv);
   float rg=1.0/sqrt(1.0-dot(cam_vel,cam_vel));
   float rdf=rg*(1.0+dot(ray_dir,-cam_vel));
@@ -287,19 +351,8 @@ void main(){
       }
     }
   }
-  if(dist>1.0){
-    ray_dir=normalize(point-oldpoint);
-    vec2 tc=to_spherical(ray_dir*ROT_Z(45.0*DEG_TO_RAD));
-    vec4 sc=texture2D(star_texture,tc);
-    if(sc.g>0.0){
-      float st=MIN_TEMPERATURE+TEMPERATURE_RANGE*sc.r;
-      float sv=sc.b-0.5; float sdf=sqrt((1.0+sv)/(1.0-sv));
-      if(doppler_shift) st/=rdf*sdf;
-      color+=vec4(temp_to_color(st),1.0)*sc.g;
-    }
-    color+=texture2D(bg_texture,tc)*0.25;
-  }
-  gl_FragColor=color*ray_intensity;
+  // Background rays are transparent — ASCII milkyway on star-canvas shows through
+  gl_FragColor=vec4(color.rgb*ray_intensity, clamp(color.a,0.0,1.0));
 }`;
 
 const bhUniforms={
@@ -313,7 +366,7 @@ const bhUniforms={
 const bhMesh=new THREE.Mesh(
   new THREE.PlaneGeometry(2,2),
   new THREE.ShaderMaterial({uniforms:bhUniforms,vertexShader:BH_VERT,fragmentShader:BH_FRAG,
-    depthTest:false,depthWrite:false,glslVersion:THREE.GLSL1}));
+    transparent:true,depthTest:false,depthWrite:false,glslVersion:THREE.GLSL1}));
 bhMesh.frustumCulled=false; bhMesh.renderOrder=-1000; scene.add(bhMesh);
 
 const txLoader=new THREE.TextureLoader();
@@ -590,6 +643,7 @@ glC.addEventListener('mousemove',e=>{
 function resize(){
   W=window.innerWidth; H=window.innerHeight;
   starC.width=W; starC.height=H;
+  setupAsciiGrid();
   renderer.setSize(W,H);
   camera.aspect=W/H; camera.updateProjectionMatrix();
   composer.setSize(W,H);
